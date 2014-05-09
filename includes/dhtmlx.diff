@@ -1,0 +1,48 @@
+diff -dPNur --exclude=imgs dhtmlx.orig/dhtmlxmenu.js dhtmlx/dhtmlxmenu.js
+--- dhtmlx.orig/dhtmlxmenu.js	2008-10-10 14:57:00.000000000 +0200
++++ dhtmlx/dhtmlxmenu.js	2008-10-29 17:14:55.000000000 +0100
+@@ -238,7 +238,7 @@
+ 			//
+ 			if (this.limit > 0 && this.limit < itemCount)  {
+ 				// set fixed size
+-				this.idPull[pId].style.height = this.idPull[pId].childNodes[0].offsetHeight*this.limit;// + arrUpH + arrDownH;
++				this.idPull[pId].style.height = this.idPull[pId].childNodes[0].offsetHeight*this.limit + "px";// + arrUpH + arrDownH;
+ 				this.idPull[pId].scrollTop = 0;
+ 			}
+ 			//
+@@ -1895,7 +1895,7 @@
+ 	if ((this.itemPull[id]["imgen"]!="")||(this.itemPull[id]["imgdis"]!="")) {
+ 		var imgTop=this.itemPull[id][(this.itemPull[id]["state"]=="enabled")?"imgen":"imgdis"];
+ 		if (imgTop) {
+-			var imgTop = "<img id='image_"+id+"' src='"+imgTop+"' class='dhtmlxMenu_"+this.skin+"_TopLevel_Item_Icon' border='0'>";
++			var imgTop = "<img id='image_"+id+"' src='"+this.imagePath+imgTop+"' class='dhtmlxMenu_"+this.skin+"_TopLevel_Item_Icon' border='0'>";
+ 			m.innerHTML = imgTop+m.innerHTML;
+ 			m.style.paddingLeft = this.topLevelItemPaddingIconExists+"px";
+ 		}
+diff -dPNur --exclude=imgs dhtmlx.orig/skins/dhtmlxmenu_standard.css dhtmlx/skins/dhtmlxmenu_standard.css
+--- dhtmlx.orig/skins/dhtmlxmenu_standard.css	2008-10-10 14:57:00.000000000 +0200
++++ dhtmlx/skins/dhtmlxmenu_standard.css	2008-10-29 16:59:18.000000000 +0100
+@@ -9,6 +9,7 @@
+ 	height: 26px;
+ 	position: relative;
+ }
++
+ div.dhtmlxMenu_standard_Middle {
+ 	position: relative;
+ 	height: 26px;
+@@ -32,6 +33,15 @@
+ 	background-image: url("../imgs/dhxmenu_standard/dhtmlxmenu_top_bg_right.gif");
+ 	background-repeat: no-repeat;
+ }
++
++
++iframe.dhtmlxMenu_IE6CoverFix_standard {
++	position: absolute;
++	border: none;
++	background: #000000;
++	filter: alpha(opacity=100);
++}
++
+ /*
+ 	top level items
+ */

@@ -1,0 +1,26 @@
+--- dhtmlxmenu_standard.css.orig	2008-10-10 14:57:00.000000000 +0200
++++ dhtmlxmenu_standard.css	2008-10-29 16:59:18.000000000 +0100
+@@ -9,6 +9,7 @@
+ 	height: 26px;
+ 	position: relative;
+ }
++
+ div.dhtmlxMenu_standard_Middle {
+ 	position: relative;
+ 	height: 26px;
+@@ -32,6 +33,15 @@
+ 	background-image: url("../imgs/dhxmenu_standard/dhtmlxmenu_top_bg_right.gif");
+ 	background-repeat: no-repeat;
+ }
++
++
++iframe.dhtmlxMenu_IE6CoverFix_standard {
++	position: absolute;
++	border: none;
++	background: #000000;
++	filter: alpha(opacity=100);
++}
++
+ /*
+ 	top level items
+ */

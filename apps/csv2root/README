@@ -1,0 +1,2 @@
+Application depends on 'Boost' and 'ROOT' libraries. Please, adjust paths in 
+makefile.

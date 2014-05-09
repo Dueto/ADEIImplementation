@@ -1,0 +1,39 @@
+--- dhtmlxtree.js.orig	2009-02-09 09:28:35.000000000 +0100
++++ dhtmlxtree.js	2009-02-09 09:35:15.000000000 +0100
+@@ -45,7 +45,7 @@
+ *     @type: public
+ *     @topic: 0
+ */
+-function dhtmlXTreeObject(htmlObject, width, height, rootId){
++function dhtmlXTreeObject(htmlObject, width, height, rootId, async){
+ 	if (_isIE) try { document.execCommand("BackgroundImageCache", false, true); } catch (e){}
+ 	if (typeof(htmlObject)!="object")
+       this.parentObject=document.getElementById(htmlObject);
+@@ -58,6 +58,9 @@
+     this.dropLower=false;
+ 	this.enableIEImageFix();
+ 
++   if (typeof async != "undefined") this.async = async;
++   else this.async = true;
++   
+    this.xmlstate=0;
+    this.mytype="tree";
+    this.smcheck=true;   //smart checkboxes
+@@ -128,7 +131,7 @@
+ 		this.allTree.oncontextmenu = function(e){ return self._doContClick(e||window.event); };   
+    this.allTree.onmousedown = function(e){ return self._doContClick(e||window.event); };  
+    
+-   this.XMLLoader=new dtmlXMLLoaderObject(this._parseXMLTree,this,true,this.no_cashe);
++   this.XMLLoader=new dtmlXMLLoaderObject(this._parseXMLTree,this,this.async,this.no_cashe);
+    if (_isIE) this.preventIECashing(true);
+ 
+ 
+@@ -411,7 +414,7 @@
+       if (!this.parsCount) this.callEvent("onXLS",[that,this._ld_id]);
+       this._ld_id=null;
+       this.xmlstate=1;
+-      this.XMLLoader=new dtmlXMLLoaderObject(this._parseXMLTree,this,true,this.no_cashe);
++      this.XMLLoader=new dtmlXMLLoaderObject(this._parseXMLTree,this, this.async,this.no_cashe);
+ 
+       if (afterCall) this.XMLLoader.waitCall=afterCall;
+       this.XMLLoader.loadXML(file);

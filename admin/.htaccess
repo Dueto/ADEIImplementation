@@ -1,0 +1,7 @@
+<Files ~ "(\.php$|^$)">
+    AuthType        Basic
+    AuthName        "ADEI Authentication"
+    AuthBasicProvider file
+    AuthUserFile    /var/www/localhost/htdocs/adei/admin/.htpasswd
+    Require         valid-user
+</Files>

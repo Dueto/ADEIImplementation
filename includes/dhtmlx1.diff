@@ -1,0 +1,26 @@
+diff -dPNurbB dhtmlx.orig/dhtmlxmenubar.js dhtmlx/dhtmlxmenubar.js
+--- dhtmlx.orig/dhtmlxmenubar.js	2007-12-14 15:14:00.000000000 +0100
++++ dhtmlx/dhtmlxmenubar.js	2008-02-21 00:34:59.000000000 +0100
+@@ -799,7 +799,7 @@
+ 							'<td class="'+this.topMenu.titleCSS+'" style="display:none">'+this.topMenu.tname+'</td>'+
+ 							'<td></td>'+
+ 							'<td align="right" '+(_isOpera?'':'width="100%"')+' class="'+this.topMenu.titleCSS+'">&nbsp;'+this.topMenu.tname+'</td>'+
+-							'<td >&nbsp;</td>'+
++							/*'<td>&nbsp;</td>'*/'<td><td>'+
+ 							'</tr></tbody></table>';
+ 			var table=div.childNodes[0];
+             table.style.display="none";
+@@ -999,7 +999,12 @@
+ 				width=parseInt(width)+"px";
+ 				if (_isOpera) td.style.width=width;
+ 			}
+-				td.innerHTML="<table align='left' cellpadding='0' cellspacing='0' border='0' style='"+(width?("width:"+width+";"):"")+" height:100%;'><tr><td width='"+(2+image_size)+"px' style=' "+(src?"":"display:none; ")+"'><img src='"+(src2?src2:this.dummyImg())+"' border='0' width='"+image_size+"px' height='"+image_size+"px'/></td><td width='100%' align='left' style=' "+(src?" padding-left:2px;":"")+" overflow:hidden;' ><table width='100%' height='100%' cellpadding='0' cellspacing='0'><tr><td title='"+tooltip+"' class='"+this.textClassName+"' nowrap='nowrap' >"+this.text+"</td><td width='12px'><img style='display:none' src='"+this.dummyImg()+"'/></td></tr></table></td></tr></table>";
++				
++				var menuhtml="<table align='left' cellpadding='0' cellspacing='0' border='0' style='"+(width?("width:"+width+";"):"")+" height:100%;'><tr><td width='"+(2+image_size)+"px' style=' "+(src?"":"display:none; ")+"'><img src='"+(src2?src2:this.dummyImg())+"' border='0' width='"+image_size+"px' height='"+image_size+"px'/></td>";
++				if (this.text.length > 0) menuhtml += "<td width='100%' align='left' style=' "+(src?" padding-left:2px;":"")+" overflow:hidden;' ><table width='100%' height='100%' cellpadding='0' cellspacing='0'><tr><td title='"+tooltip+"' class='"+this.textClassName+"' nowrap='nowrap' >"+this.text+"</td><td width='12px'><img style='display:none' src='"+this.dummyImg()+"'/></td></tr></table></td>";
++				else menuhtml += "<td width='100%' align='left' style=' "+(src?" padding-left:2px;":"")+" overflow:hidden; display: none' ><table width='100%' height='100%' cellpadding='0' cellspacing='0'><tr><td title='"+tooltip+"' class='"+this.textClassName+"' nowrap='nowrap' >"+this.text+"</td><td width='12px'><img style='display:none' src='"+this.dummyImg()+"'/></td></tr></table></td>";
++				menuhtml+="</tr></table>";
++				td.innerHTML = menuhtml;
+ 				this.imageTag=td.childNodes[0].childNodes[0].childNodes[0].childNodes[0].childNodes[0];
+ 				this.childMenuTag=td.childNodes[0].childNodes[0].childNodes[0].childNodes[1].childNodes[0].childNodes[0].childNodes[0].childNodes[1].childNodes[0];
+                 this.textTag=this.childMenuTag.parentNode.parentNode.childNodes[0];

@@ -1,0 +1,617 @@
+diff -dPNurbB cropper.1.2/cropper.css cropper/cropper.css
+--- cropper.1.2/cropper.css	2006-10-30 20:58:25.000000000 +0100
++++ cropper/cropper.css	2008-01-26 17:14:11.000000000 +0100
+@@ -17,17 +17,39 @@
+ 	font-size: 0;
+ }
+ 
++.imgCrop_apply {
++	position: absolute;
++	background: url(applyArrow.png);
++	border: green solid 1px;
++	width: 19px;
++	height: 20px;
++	margin: 5px;
++	cursor: pointer;
++}
++
+ .imgCrop_overlay {
++/*
++	DS: Replacing selected part
+ 	background-color: #000;
+ 	opacity: 0.5;
+ 	filter:alpha(opacity=50);
++*/
+ 	position: absolute;
+ 	width: 100%;
+ 	height: 100%;
+ }
+ 
+ .imgCrop_selArea {
++/*
++	DS: Selecting
++*/
++	background-color: #FFB;
++	opacity: 0.5;
++	filter:alpha(opacity=50);
++	
++	
+ 	position: absolute;
++	
+ 	/* @done_in_js 
+ 	top: 20px;
+ 	left: 20px;
+diff -dPNurbB cropper.1.2/cropper.js cropper/cropper.js
+--- cropper.1.2/cropper.js	2006-10-30 20:58:25.000000000 +0100
++++ cropper/cropper.js	2008-01-26 17:09:23.000000000 +0100
+@@ -262,6 +262,26 @@
+ 				 */
+ 				onEndCrop: Prototype.emptyFunction,
+ 				/**
++				 * @var function
++				 * The call back function to be called if crop is canceled
++				 */
++				onCancelCrop: Prototype.emptyFunction,
++				/**
++				 * @var function
++				 * The call back function to pass the final values to
++				 */
++				onDblClick: Prototype.emptyFunction,
++				/**
++				 * @var function
++				 * The call back function to pass the final values to
++				 */
++				onApplyClick: null,
++				/**
++				 * @var function
++				 * The call back function to handle click event
++				 */
++				onClick: null,
++				/**
+ 				 * @var boolean
+ 				 * Whether to capture key presses or not
+ 				 */
+@@ -280,7 +300,38 @@
+ 				 * @var int
+ 				 * The maximum height for the select areas in pixels (if both minHeight & maxHeight set to same the height of the cropper will be fixed)
+ 				 */
+-				maxHeight: 0
++				maxHeight: 0,
++				/**
++				 * @var obj Coordinate object left, top, right, bottom
++				 * The non-selectable margins
++				 */
++				margins: { left: 0, top: 0, right: 0, bottom: 0 },
++				/**
++				 * @var int
++				 * If width is below this value, we are selecting whole horizontal range
++				 */
++				allWidth: 0,
++				/**
++				 * @var int
++				 * If height is below this value, we are selecting whole vertical range
++				 */
++				allHeight: 0,
++				/**
++				 * @var boolean
++				 * Whether to monitor reloading of picture
++				 */
++				monitorImage: true,
++				/**
++				 * @var boolean
++				 * Whether the image is already loaded
++				 */
++				imageReady: false,
++				/**
++				 * @var int
++				 * Maximal duration of the click event in ms (after dragging is started)
++				 */
++				clickDuration: 200
++
+ 			}, 
+ 			options || {}
+ 		);				
+@@ -306,6 +357,16 @@
+ 		this.resizing		= false;
+ 		/**
+ 		 * @var boolean
++		 * Whether the selected area is present on the screen
++		 */
++		this.selected		= false;
++		/**
++		 * @var boolean
++		 * Whether the selected area is present on the screen
++		 */
++		this.altered		= false;
++		/**
++		 * @var boolean
+ 		 * Whether the user is on a webKit browser
+ 		 */
+ 		this.isWebKit 		= /Konqueror|Safari|KHTML/.test( navigator.userAgent );
+@@ -380,8 +441,10 @@
+ 		// only load the event observers etc. once the image is loaded
+ 		// this is done after the subInitialize() call just in case the sub class does anything
+ 		// that will affect the result of the call to onLoad()
+-		if( this.img.complete || this.isWebKit ) this.onLoad(); // for some reason Safari seems to support img.complete but returns 'undefined' on the this.img object
+-		else Event.observe( this.img, 'load', this.onLoad.bindAsEventListener( this) );		
++		if( this.options.imageReady || this.img.complete || this.isWebKit ) {
++		    this.onLoad(); // for some reason Safari seems to support img.complete but returns 'undefined' on the this.img object
++		    if (this.options.monitorImage) Event.observe( this.img, 'load', this.onLoad.bindAsEventListener( this) );
++		} else Event.observe( this.img, 'load', this.onLoad.bindAsEventListener( this) );
+ 	},
+ 	
+ 	/**
+@@ -437,6 +500,14 @@
+ 		 * 		</div>	
+ 		 * </div>
+ 		 */
++
++		if (this.attached) {
++		    if (this.monitorImage) {
++			this.setParams();
++		    }
++		    return;
++		}
++		 
+ 		var cNamePrefix = 'imgCrop_';
+ 		
+ 		// get the point to insert the container
+@@ -447,12 +518,19 @@
+ 		if( this.isOpera8 ) fixOperaClass = ' opera8';
+ 		this.imgWrap = Builder.node( 'div', { 'class': cNamePrefix + 'wrap' + fixOperaClass } );
+ 		
++		this.applyLinked = 0;
++		this.applyButton = Builder.node( 'div', { 'class': cNamePrefix + 'apply' } );
++		
+ 		this.north		= Builder.node( 'div', { 'class': cNamePrefix + 'overlay ' + cNamePrefix + 'north' }, [Builder.node( 'span' )] );
++		this.north_east		= Builder.node( 'div', { 'class': cNamePrefix + 'overlay ' + cNamePrefix + 'north' }, [Builder.node( 'span' )] );
++		this.north_west		= Builder.node( 'div', { 'class': cNamePrefix + 'overlay ' + cNamePrefix + 'north' }, [Builder.node( 'span' )] );
+ 		this.east		= Builder.node( 'div', { 'class': cNamePrefix + 'overlay ' + cNamePrefix + 'east' } , [Builder.node( 'span' )] );
+ 		this.south		= Builder.node( 'div', { 'class': cNamePrefix + 'overlay ' + cNamePrefix + 'south' }, [Builder.node( 'span' )] );
++		this.south_east		= Builder.node( 'div', { 'class': cNamePrefix + 'overlay ' + cNamePrefix + 'south' }, [Builder.node( 'span' )] );
++		this.south_west		= Builder.node( 'div', { 'class': cNamePrefix + 'overlay ' + cNamePrefix + 'south' }, [Builder.node( 'span' )] );
+ 		this.west		= Builder.node( 'div', { 'class': cNamePrefix + 'overlay ' + cNamePrefix + 'west' } , [Builder.node( 'span' )] );
+ 		
+-		var overlays	= [ this.north, this.east, this.south, this.west ];
++		var overlays	= [ this.north_west, this.north, this.north_east, this.east, this.south_east, this.south, this.south_west, this.west ];
+ 
+ 		this.dragArea	= Builder.node( 'div', { 'class': cNamePrefix + 'dragArea' }, overlays );
+ 						
+@@ -499,6 +577,14 @@
+ 		
+ 		this.endCropBind 	= this.endCrop.bindAsEventListener( this );
+ 		Event.observe( document, 'mouseup', this.endCropBind );
++//		Event.observe( this.imgWrap, 'mouseup', this.endCropBind );
++		
++		this.dblClickBind	= this.dblClick.bindAsEventListener( this );
++		Event.observe( this.selArea, 'dblclick', this.dblClickBind );
++		
++		this.applyClickBind	= this.applyClick.bindAsEventListener( this );
++		Event.observe( this.applyButton, 'mousedown', this.applyClickBind );
++//		Event.observe( this.applyButton, 'click', this.applyClickBind );
+ 		
+ 		this.resizeBind		= this.startResize.bindAsEventListener( this );
+ 		this.handles = [ this.handleN, this.handleNE, this.handleE, this.handleSE, this.handleS, this.handleSW, this.handleW, this.handleNW ];
+@@ -570,8 +656,12 @@
+ 		this.imgH = this.img.height;			
+ 
+ 		$( this.north ).setStyle( { height: 0 } );
++		$( this.north_east ).setStyle( { height: 0 } );
++		$( this.north_west ).setStyle( { height: 0 } );
+ 		$( this.east ).setStyle( { width: 0, height: 0 } );
+ 		$( this.south ).setStyle( { height: 0 } );
++		$( this.south_east ).setStyle( { height: 0 } );
++		$( this.south_west ).setStyle( { height: 0 } );
+ 		$( this.west ).setStyle( { width: 0, height: 0 } );
+ 		
+ 		// resize the container to fit the image
+@@ -580,8 +670,17 @@
+ 		// hide the select area
+ 		$( this.selArea ).hide();
+ 						
++		// hide apply button
++		if (this.applyLinked) {
++		    this.dragArea.removeChild(this.applyButton);
++		    this.applyLinked = false;
++		}
++		
++		this.selected = false;
++		this.altered = false;
++						
+ 		// setup the starting position of the select area
+-		var startCoords = { x1: 0, y1: 0, x2: 0, y2: 0 };
++		var startCoords = { x1: this.options.margins.left, y1: this.options.margins.top, x2: this.options.margins.left, y2: this.options.margins.top };
+ 		var validCoordsSet = false;
+ 		
+ 		// display the select area 
+@@ -627,6 +726,10 @@
+ 			Event.stopObserving( this.dragArea, 'mousedown', this.startDragBind );
+ 			Event.stopObserving( document, 'mousemove', this.onDragBind );		
+ 			Event.stopObserving( document, 'mouseup', this.endCropBind );
++//			Event.stopObserving( this.imgWrap, 'mouseup', this.endCropBind );
++			Event.stopObserving( this.selArea, 'dblclick', this.dblClickBind );
++			Event.stopObserving( this.applyButton, 'mousedown', this.applyClickBind );
++			
+ 			this.registerHandles( false );
+ 			if( this.options.captureKeys ) Event.stopObserving( document, 'keypress', this.keysBind );
+ 		}
+@@ -645,6 +748,39 @@
+ 	},
+ 	
+ 	/**
++	 * Resets the cropper selection
++	 * 
++	 * @access public
++	 * @return void
++	 */
++	clear: function() {
++		$( this.north ).setStyle( { height: 0 } );
++		$( this.north_east ).setStyle( { height: 0 } );
++		$( this.north_west ).setStyle( { height: 0 } );
++		$( this.east ).setStyle( { width: 0, height: 0 } );
++		$( this.south ).setStyle( { height: 0 } );
++		$( this.south_east ).setStyle( { height: 0 } );
++		$( this.south_west ).setStyle( { height: 0 } );
++		$( this.west ).setStyle( { width: 0, height: 0 } );
++
++		// hide the select area
++		$( this.selArea ).hide();
++		
++		// hide apply button
++		if (this.applyLinked) {
++		    this.dragArea.removeChild(this.applyButton);
++		    this.applyLinked = false;
++		}
++		
++		//
++		this.selected = false;
++		this.altered = false;
++		
++        	this.setAreaCoords( { x1: this.options.margins.left, y1: this.options.margins.top, x2: this.options.margins.left, y2: this.options.margins.top }, false, false, null );
++		this.drawArea();
++	},
++	
++	/**
+ 	 * Handles the key functionality, currently just using arrow keys to move, if the user
+ 	 * presses shift then the area will move by 10 pixels
+ 	 */
+@@ -710,6 +846,7 @@
+ 	 */
+ 	moveArea: function( point ) {
+ 		// dump( 'moveArea        : ' + point[0] + ',' + point[1] + ',' + ( point[0] + ( this.areaCoords.x2 - this.areaCoords.x1 ) ) + ',' + ( point[1] + ( this.areaCoords.y2 - this.areaCoords.y1 ) ) + '\n' );
++		this.altered = true;
+ 		this.setAreaCoords( 
+ 			{
+ 				x1: point[0], 
+@@ -754,28 +891,28 @@
+ 			var targH = coords.y2 - coords.y1;
+ 			
+ 			// ensure we're within the bounds
+-			if( coords.x1 < 0 ) {
+-				coords.x1 = 0;
+-				coords.x2 = targW;
++			if( coords.x1 < this.options.margins.left ) {
++				coords.x1 = this.options.margins.left;
++				coords.x2 = this.options.margins.left + targW;
+ 			}
+-			if( coords.y1 < 0 ) {
+-				coords.y1 = 0;
+-				coords.y2 = targH;
++			if( coords.y1 < this.options.margins.top ) {
++				coords.y1 = this.options.margins.top;
++				coords.y2 = this.options.margins.top + targH;
+ 			}
+-			if( coords.x2 > this.imgW ) {
+-				coords.x2 = this.imgW;
+-				coords.x1 = this.imgW - targW;
++			if( coords.x2 > (this.imgW - this.options.margins.right) ) {
++				coords.x2 = this.imgW - this.options.margins.right;
++				coords.x1 = coords.x2 - targW;
+ 			}
+-			if( coords.y2 > this.imgH ) {
+-				coords.y2 = this.imgH;
+-				coords.y1 = this.imgH - targH;
++			if( coords.y2 > (this.imgH - this.options.margins.bottom) ) {
++				coords.y2 = this.imgH - this.options.margins.bottom;
++				coords.y1 = coords.y2 - targH;
+ 			}			
+ 		} else {
+ 			// ensure we're within the bounds
+-			if( coords.x1 < 0 ) coords.x1 = 0;
+-			if( coords.y1 < 0 ) coords.y1 = 0;
+-			if( coords.x2 > this.imgW ) coords.x2 = this.imgW;
+-			if( coords.y2 > this.imgH ) coords.y2 = this.imgH;
++			if( coords.x1 < this.options.margins.left ) coords.x1 = this.options.margins.left;
++			if( coords.y1 < this.options.margins.top ) coords.y1 = this.options.margins.top;
++			if( coords.x2 > (this.imgW - this.options.margins.right) ) coords.x2 = this.imgW - this.options.margins.right;
++			if( coords.y2 > (this.imgH - this.options.margins.bottom) ) coords.y2 = this.imgH - this.options.margins.bottom;
+ 			
+ 			// This is passed as null in onload
+ 			if( direction != null ) {
+@@ -819,7 +956,7 @@
+ 			}
+ 		}
+ 		
+-		// dump( 'setAreaCoords (out) : ' + coords.x1 + ',' + coords.y1 + ',' + coords.x2 + ',' + coords.y2 + '\n' );
++//		dump( 'setAreaCoords (out) : ' + coords.x1 + ',' + coords.y1 + ',' + coords.x2 + ',' + coords.y2 + '\n' );
+ 		this.areaCoords = coords;
+ 	},
+ 	
+@@ -1000,8 +1137,58 @@
+ 		this.handleS.style.left 	= horizHandlePos;
+ 		this.handleW.style.top		= vertHandlePos;
+ 		
++		if ((areaWidth < this.options.allWidth)&&(areaHeight<this.options.allHeight)) {
++		    if (this.applyLinked) {
++			this.dragArea.removeChild(this.applyButton);
++			this.applyLinked = false;
++		    }
++		    this.east.className = "imgCrop_overlay";
++		    this.west.className = "imgCrop_overlay";
++		    this.north.className = "imgCrop_overlay";
++		    this.south.className = "imgCrop_overlay";
++		} else if (areaWidth < this.options.allWidth) {
++		    if ((this.options.onApplyClick)&&(!this.applyLinked)) {
++			this.dragArea.appendChild(this.applyButton);
++			this.applyLinked = true;
++		    }
++		    this.east.className = "imgCrop_selArea";
++		    this.west.className = "imgCrop_selArea";
++		    this.north.className = "imgCrop_overlay";
++		    this.south.className = "imgCrop_overlay";
++		} else if (areaHeight < this.options.allHeight) {
++		    if ((this.options.onApplyClick)&&(!this.applyLinked)) {
++			this.dragArea.appendChild(this.applyButton);
++			this.applyLinked = true;
++		    }
++		    this.east.className = "imgCrop_overlay";
++		    this.west.className = "imgCrop_overlay";
++		    this.north.className = "imgCrop_selArea";
++		    this.south.className = "imgCrop_selArea";
++		} else {
++		    if ((this.options.onApplyClick)&&(!this.applyLinked)) {
++			this.dragArea.appendChild(this.applyButton);
++			this.applyLinked = true;
++		    }
++		    this.east.className = "imgCrop_overlay";
++		    this.west.className = "imgCrop_overlay";
++		    this.north.className = "imgCrop_overlay";
++		    this.south.className = "imgCrop_overlay";
++		}
++		
+ 		// draw the four overlays
+-		this.north.style.height 	= params[1];
++		var northStyle			= this.north.style;
++		northStyle.height 		= params[1];
++		northStyle.left			= params[0];
++		northStyle.width		= params[2];
++		
++		var neStyle			= this.north_east.style;
++		neStyle.height			= params[1];
++		neStyle.width			= params[0];
++
++		var nwStyle			= this.north_west.style;
++		nwStyle.height			= params[1];
++		nwStyle.left			= params[4];
++		nwStyle.width			= params[6];
+ 		
+ 		var eastStyle 				= this.east.style;
+ 		eastStyle.top				= params[1];
+@@ -1012,12 +1199,33 @@
+ 	   	var southStyle 				= this.south.style;
+ 	   	southStyle.top				= params[5];
+ 	   	southStyle.height			= params[7];
++		southStyle.left			= params[0];
++		southStyle.width		= params[2];
++
++		var seStyle			= this.south_east.style;
++	   	seStyle.top			= params[5];
++	   	seStyle.height			= params[7];
++		seStyle.width			= params[0];
++
++		var swStyle			= this.south_west.style;
++	   	swStyle.top			= params[5];
++	   	swStyle.height			= params[7];
++		swStyle.left			= params[4];
++		swStyle.width			= params[6];
+ 	   
+ 	    var westStyle       		= this.west.style;
+ 	    westStyle.top				= params[1];
+ 	    westStyle.height			= params[3];
+ 	   	westStyle.width				= params[0];
+ 	   	
++		
++		if (this.applyButton.parentNode) {
++		    var applyStyle = this.applyButton.style;
++		    applyStyle.left = params[4];
++		    applyStyle.top = params[5];
++		}
++	   	
++
+ 		// call the draw method on sub classes
+ 		this.subDrawArea();
+ 		
+@@ -1067,7 +1275,9 @@
+ 	startResize: function( e ) {
+ 		this.startCoords = this.cloneCoords( this.areaCoords );
+ 		
++		this.altered = true;
+ 		this.resizing = true;
++
+ 		this.resizeHandle = Event.element( e ).classNames().toString().replace(/([^N|NE|E|SE|S|SW|W|NW])+/, '');
+ 		// dump( 'this.resizeHandle : ' + this.resizeHandle + '\n' );
+ 		Event.stop( e );
+@@ -1081,12 +1291,22 @@
+ 	 * @return void
+ 	 */
+ 	startDrag: function( e ) {	
++	    if (!this.dragging) {
++		var curtime = new Date();
++		this.start_time = curtime.getTime();
++	    }
++		
+ 		this.selArea.show();
+ 		this.clickCoords = this.getCurPos( e );
+      	
+     	this.setAreaCoords( { x1: this.clickCoords.x, y1: this.clickCoords.y, x2: this.clickCoords.x, y2: this.clickCoords.y }, false, false, null );
+     	
++	    this.altered = true;
+     	this.dragging = true;
++
++	    if (this.options.onClick)
++		this.dragged = false;
++	    else
+     	this.onDrag( e ); // incase the user just clicks once after already making a selection
+     	Event.stop( e );
+ 	},
+@@ -1101,12 +1321,15 @@
+ 	getCurPos: function( e ) {
+ 		// get the offsets for the wrapper within the document
+ 		var el = this.imgWrap, wrapOffsets = Position.cumulativeOffset( el );
++		
+ 		// remove any scrolling that is applied to the wrapper (this may be buggy) - don't count the scroll on the body as that won't affect us
++/* DS: Causes problems in Opera9 (IE, Seamonkey are OK)
+ 		while( el.nodeName != 'BODY' ) {
+ 			wrapOffsets[1] -= el.scrollTop  || 0;
+ 			wrapOffsets[0] -= el.scrollLeft || 0;
+ 			el = el.parentNode;
+ 	    }		
++*/
+ 		return curPos = { 
+ 			x: Event.pointerX(e) - wrapOffsets[0],
+ 			y: Event.pointerY(e) - wrapOffsets[1]
+@@ -1122,6 +1345,7 @@
+ 	 */
+   	onDrag: function( e ) {
+   		if( this.dragging || this.resizing ) {	
++			this.dragged = true;
+   		
+   			var resizeHandle = null;
+   			var curPos = this.getCurPos( e );			
+@@ -1191,17 +1415,108 @@
+ 	 * @access private
+ 	 * @return void
+ 	 */
+-	endCrop : function() {
++	endCrop : function(e) {
++		var click = false;
++		var w, h;
++		
++		if ((this.dragging)&&(this.start_time)) {
++		    var curtime = new Date();
++		    var duration = curtime.getTime() - this.start_time;
++		    
++		    if (duration < this.options.clickDuration) click = true;
++		} 
++
++		
+ 		this.dragging = false;
+ 		this.resizing = false;
+ 		
++		w = this.calcW();
++		h = this.calcH();
++		
++		if (click) {
++		    if ((w>this.options.allWidth)||(h>this.options.allHeight)) click = false;
++		}
++		
++		if (click) {
++		    var x = this.areaCoords.x1;
++		    var y = this.areaCoords.y1;
++
++		    if (this.selected) {
++			this.options.onCancelCrop();
++			this.clear();
++		    } else if (this.options.onClick) {
++			this.options.onClick(e,
++			    {
++				x: x,
++				y: y
++			    }
++			);
++			this.clear();
++		    }
++		} else if ((w>this.options.allWidth)||(h>this.options.allHeight)) {
++		    if (!this.dragged)	this.onDrag( e );
++		    
++		    if (this.altered) {
+ 		this.options.onEndCrop(
+ 			this.areaCoords,
+ 			{
++				width: w, 
++				height: h 
++			    }
++			);
++			this.altered = false;
++		    }
++		    this.selected = true;
++		} else {
++		    this.clear();
++		}
++	},
++	
++	/**
++	 * Passes the values of the select area on to the appropriate 
++	 * callback function on double click in cropping area
++	 * 
++	 * @access private
++	 * @return void
++	 */
++	dblClick : function() {
++		this.dragging = false;
++		this.resizing = false;
++		
++		var w = this.calcW();
++		var h = this.calcH();
++		
++		if ((w > this.options.allWidth)&&(h > this.options.allHeight)) {
++		    this.options.onDblClick(
++			this.areaCoords,
++			{
++				width: w, 
++				height: h 
++			}
++		    );
++		}
++	},
++
++	/**
++	 * Passes the values of the select area on to the appropriate 
++	 * callback function on a click on apply button
++	 * 
++	 * @access private
++	 * @return void
++	 */
++	applyClick : function(ev) {
++		this.dragging = false;
++		this.resizing = false;
++		
++		this.options.onApplyClick(
++			this.areaCoords,
++			{
+ 				width: this.calcW(), 
+ 				height: this.calcH() 
+ 			}
+ 		);
++		//ev.cancelBubble = true;
++		Event.stop( ev );
+ 	},
+ 	
+ 	/**
+diff -dPNurbB cropper.1.2/licence.txt cropper/licence.txt
+--- cropper.1.2/licence.txt	2006-10-30 20:58:25.000000000 +0100
++++ cropper/licence.txt	1970-01-01 01:00:00.000000000 +0100
+@@ -1,12 +0,0 @@
+-Copyright (c) 2006, David Spurr (www.defusion.org.uk)
+-All rights reserved.
+-
+-Redistribution and use in source and binary forms, with or without modification, are permitted provided that the following conditions are met:
+-
+-    * Redistributions of source code must retain the above copyright notice, this list of conditions and the following disclaimer.
+-    * Redistributions in binary form must reproduce the above copyright notice, this list of conditions and the following disclaimer in the documentation and/or other materials provided with the distribution.
+-    * Neither the name of the David Spurr nor the names of its contributors may be used to endorse or promote products derived from this software without specific prior written permission.
+-
+-THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+-
+-http://www.opensource.org/licenses/bsd-license.php
+\ No newline at end of file
