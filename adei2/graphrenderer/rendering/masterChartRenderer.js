@@ -6,10 +6,16 @@ var masterChartRenderer = function()
     me.zoomCallback = '';
     me.chart = null;
     me.series = [];
+    me.dragData = null;
+    me.previousStateX = null;
+    me.divWidth = null;
+
+    me.detailChart = null;
 
     me.renderMasterChar = function(id, series)
     {
         var self = this;
+        self.divWidth = document.getElementById(id).offsetWidth;
         self.id = id;
         var ser = {};
         ser.data = [];
@@ -135,6 +141,146 @@ var masterChartRenderer = function()
     me.setOnZoomCallback = function(zoomCallback)
     {
         this.zoomCallback = zoomCallback;
+    };
+
+    me.startDrag = function(event)
+    {
+        var self = this;
+        var x = event.offsetX - self.chart.plotLeft;
+        var plotBandBefore = self.chart.xAxis[0].plotLinesAndBands[0];
+        var plotBandAfter = self.chart.xAxis[0].plotLinesAndBands[1];
+        var begTime = plotBandBefore.options.to;
+        var endTime = plotBandAfter.options.from;
+        
+        var startPoint;
+        var endPoint;
+        for(var i = 0; i < self.chart.series[0].points.length; i++)     
+        {
+            var date = self.chart.series[0].points[i].x;
+            if(begTime < date)
+            {
+                startPoint = self.chart.series[0].points[i];
+                for(var j = i; j < self.chart.series[0].points.length; j++)
+                {
+                    date = self.chart.series[0].points[j].x;
+                    if(endTime < date)
+                    {
+                        endPoint = self.chart.series[0].points[j];
+                        break;
+                    }
+                }
+                break;
+            }
+        }
+
+        if(typeof startPoint.plotX !== 'undefined' && typeof endPoint.plotX !== 'undefined')
+        {            
+            if(startPoint.plotX <= x && endPoint.plotX >= x)
+            {
+                document.body.style.cursor = "move";
+                self.dragData =
+                {
+                    x: event.offsetX,
+                    y: event.offsetY,
+                    begTime: begTime,
+                    endTime: endTime
+                };  
+                event.cancelBubble = true;
+                event.stopPropagation();
+            } 
+            else
+            {
+                self.dragData = null;
+                event.cancelBubble = false;    
+            }
+        }
+
+
+
+    };
+
+    me.setUpDetailChart = function(detailChart)
+    {
+        var self = this;
+        self.detailChart = detailChart;
+    }
+
+    me.drag = function(event)
+    {
+        var self = this;
+        if(self.dragData)
+        {
+            for(var i = 0; i < self.detailChart.chart.yAxis.length; i++)
+            {
+                var yAxis = self.detailChart.chart.yAxis[i];
+                var max = yAxis.getExtremes().dataMax;
+                var min = yAxis.getExtremes().dataMin;
+                var margin = (max - min) / 10;
+                self.detailChart.chart.yAxis[i].options.startOnTick = false;
+                self.detailChart.chart.yAxis[i].options.endOnTick = false;
+                yAxis.setExtremes(min - margin, max + margin);
+            }
+            event.cancelBubble = true;
+            event.stopPropagation();
+            var e = event || window.event;            
+
+            if (self.previousStateX === null)
+            {
+                self.previousStateX = e.clientX;                
+            }
+            var mapDiffX = e.clientX - self.previousStateX;
+
+            var begTime = self.dragData.begTime;
+            var endTime = self.dragData.endTime;
+
+            var multiplier = (self.chart.xAxis[0].max - self.chart.xAxis[0].min) / self.divWidth;  
+
+            btime = begTime + mapDiffX * multiplier;
+            etime = endTime + mapDiffX * multiplier;
+            self.changePlotbands(btime, etime);
+            self.detailChart.zoomChart(btime / 1000, etime / 1000, false);
+
+        }
+        else
+        {
+            event.cancelBubble = false;
+        }
+
+    };
+
+    me.stopDrag = function(event)
+    {
+        var self = this;
+        if (self.dragData)
+        {            
+            event.cancelBubble = true;
+            event.stopPropagation();
+            self.dragData = null;
+            self.previousStateX = null;
+            document.body.style.cursor = "default";
+            var btime = self.detailChart.chart.xAxis[0].min / 1000;
+            var etime = self.detailChart.chart.xAxis[0].max / 1000;            
+            self.detailChart.refreshChart(btime, etime);
+            for(var i = 0; i < self.detailChart.chart.yAxis.length; i++)
+            {
+                var yAxis = self.detailChart.chart.yAxis[i];
+                var max = yAxis.getExtremes().dataMax;
+                var min = yAxis.getExtremes().dataMin;
+                var margin = (max - min) / 10;
+                self.detailChart.chart.yAxis[i].options.startOnTick = false;
+                self.detailChart.chart.yAxis[i].options.endOnTick = false;
+                yAxis.setExtremes(min - margin, max + margin);
+            }
+        }
+    };
+
+    me.bindEvents = function(event)
+    {
+        var self = this;
+        mooveContainer = document.getElementById('mooveDiv');
+        mooveContainer.addEventListener('mousedown', self.startDrag.bind(self), true);
+        mooveContainer.addEventListener('mousemove', self.drag.bind(self), true);
+        mooveContainer.addEventListener('mouseup', self.stopDrag.bind(self), true);        
     };
 
     me.onSelectionCallback = function(event)

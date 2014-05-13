@@ -13,6 +13,9 @@ var detailChartRenderer = function()
     
     me.neddenAxes = [];
     me.axesToChannels = [];
+    me.dataSourcesToChannels = [];
+
+    me.temporaryAxis = {gridLineWidth: 0, id: 'temporary',labels: {format: '{value}', style: { color: 'black'}}, title: {text: 'Temporary axis', style: { color: 'black'}}};
 
     me.series = '';
     me.divWidth = '';
@@ -20,7 +23,7 @@ var detailChartRenderer = function()
     me.pointCount = '';
     me.timer = '';
     me.delta = 0;
-    me.resolutionMultiplier = 0.2;
+    me.resolutionMultiplier = 0.4;
     me.zoomMultiplier = 20;
     me.tooltipX = 10;
     me.tooltipY = 35;
@@ -65,11 +68,11 @@ var detailChartRenderer = function()
         {
             dataSource.aggregation = 'mean';
         }      
-        me.axesToShow = [];
+        me.axesToShow = [];        
         if(parseInt(cfg.window) !== 0)
         {
-            self.needenWindow = (cfg.window);
-            self.firstRequest = true;
+            self.needenWindow = (cfg.window);      
+            self.firstRequest = true;      
         }
         if(dataSource.db_server === 'virtual' && dataSource.db_name === 'srctree')
         {
@@ -78,6 +81,7 @@ var detailChartRenderer = function()
             self.pointCount = self.divWidth * self.resolutionMultiplier;
             self.onDraggingRigth = self.divWidth - self.onDraggingLeft;
             self.bindEvents();
+            self.masterChart.bindEvents();
             self.masterChart.setOnZoomCallback(self.onZoomMasterChartEvent.bind(self));
             var srctree = cfg.srctree.split(',');
             var virtualSources = self.formVirtualSources(srctree);
@@ -85,10 +89,8 @@ var detailChartRenderer = function()
             var min = 9999999999999999;
             var max = 0;                
             for (var i = 0; i < virtualSources.length; i++) 
-            {  
-               
+            {                 
                 self.formAxesInfo(virtualSources[i]);
-
                 if(experiment === '-' || experiment === '*-*')
                 { 
                     var time = self.getExperimentInterval(virtualSources[i]);                           
@@ -146,7 +148,8 @@ var detailChartRenderer = function()
 
     };
 
-    me.renderChart = function(experiment)
+    me
+    .renderChart = function(experiment)
     {
         var self = this;       
         self.divWidth = self.getDivWidth(self.id);
@@ -154,8 +157,10 @@ var detailChartRenderer = function()
         self.pointCount = self.divWidth * self.resolutionMultiplier;
         self.onDraggingRigth = self.divWidth - self.onDraggingLeft;
         self.bindEvents();
+        self.masterChart.bindEvents();
 
         self.series = [];
+        self.dataSourcesToChannels = [];
         self.formChart(self.id, self.series);
         self.chart = jQuery('#' + self.id).highcharts();
         self.masterChart.setOnZoomCallback(self.onZoomMasterChartEvent.bind(self));
@@ -177,7 +182,12 @@ var detailChartRenderer = function()
                         for (var i = 0; i < obj.data.length; i++)
                         {
                             var series = self.parseData(obj, i);
+                            series.dataSource = self.dataSources[self.currentDataSource].db_server + ' ' + self.dataSources[self.currentDataSource].db_name + ' ' + self.dataSources[self.currentDataSource].db_group;                        
                             self.addSeries(series, true);  
+                            self.dataSourcesToChannels.push(self.dataSources[0].db_server  + ' '
+                            + self.dataSources[0].db_name  + ' ' 
+                            + self.dataSources[0].db_group);
+
                         }
                         var masterSeries = {};
                         masterSeries.data = self.series[0].data;
@@ -237,6 +247,10 @@ var detailChartRenderer = function()
                                 {
                                     selection: self.onZoomEvent.bind(self)
                                 },
+                        interpolate: 
+                                {
+                                    enabled: true                                                                                   
+                                },
                         plotShadow: true,
                         animation: false,
                         marginRight: self.onDraggingLeft
@@ -289,6 +303,9 @@ var detailChartRenderer = function()
                                 },
                         series:
                                 {
+                                    stacking: null,
+                                    allowPointSelect: true,
+                                    connectNulls: false,
                                     cursor: 'pointer',
                                     point:
                                             {
@@ -414,11 +431,14 @@ var detailChartRenderer = function()
                     return;                   
                 }
                 else
-                {
+                {                   
                     for (var i = 0; i < obj.data.length; i++)
                     {
-                        var series = self.parseData(obj, i);                             
-                        self.series.push(series);
+                        var series = self.parseData(obj, i); 
+                        self.series.push(series);                            
+                        /*self.dataSourcesToChannels.push(self.dataSources[self.currentDataSource].db_server  + ' '
+                        + self.dataSources[self.currentDataSource].db_name  + ' ' 
+                        + self.dataSources[self.currentDataSource].db_group);*/
 
                     }
                     self.currentDataSource++;
@@ -441,7 +461,11 @@ var detailChartRenderer = function()
         var self = this;
         if (self.currentDataSource === 0)
         {
-            self.series = [];
+            /*if(self.chart.series.length !== self.dataSourcesToChannels.length)
+            {
+                self.dataSourcesToChannels = []; 
+            }*/
+            self.series = [];       
             self.refreshZoomSeries(beginTime, endTime);
         }
         else if (self.currentDataSource < self.dataSources.length)
@@ -456,17 +480,17 @@ var detailChartRenderer = function()
             {
                 if(typeof self.chart.series[i] !== 'undefined')
                 {                    
-                    self.chart.series[i].setData(self.series[i].data);                    
+                    self.chart.series[i].setData(self.series[i].data);                                     
                 }    
                 else if(self.series.length > self.chart.series.length)
                 {
-                    self.addSeries(self.series[i], false);
+                    self.addSeries(self.series[i], false);  
                 }            
             }
             
             var xAxis = self.chart.xAxis[0];
             xAxis.setExtremes(beginTime * 1000, endTime * 1000);
-            self.chart.redraw();
+            //self.chart.redraw();
             self.currentDataSource = 0;
         }
     };
@@ -486,6 +510,9 @@ var detailChartRenderer = function()
                     self.currentDataSource++;
                     self.refreshChartFromMasterChart(beginTime, endTime);
                     self.addSeries({data: [], name: '', pointInterval: self.dataSourceLevel * 1000}, false);
+                    self.dataSourcesToChannels.push(self.dataSources[self.currentDataSource].db_server  + ' '
+                        + self.dataSources[self.currentDataSource].db_name  + ' ' 
+                        + self.dataSources[self.currentDataSource].db_group);
                     //alert('No data in server responces.');
                     console.log('No data in server responces');
                     return;
@@ -495,7 +522,11 @@ var detailChartRenderer = function()
                     for (var i = 0; i < obj.data.length; i++)
                     {             
                         var series = self.parseData(obj, i);
+                        series.dataSource = self.dataSources[self.currentDataSource].db_server + ' ' + self.dataSources[self.currentDataSource].db_name + ' ' + self.dataSources[self.currentDataSource].db_group;
                         self.addSeries(series, false);
+                        self.dataSourcesToChannels.push(self.dataSources[self.currentDataSource].db_server  + ' '
+                        + self.dataSources[self.currentDataSource].db_name  + ' ' 
+                        + self.dataSources[self.currentDataSource].db_group);
                     }
                     self.currentDataSource++;
                     self.refreshChartFromMasterChart(beginTime, endTime);
@@ -518,12 +549,13 @@ var detailChartRenderer = function()
             {
                 self.chart.destroy();               
             }         
+            self.dataSourcesToChannels = [];
             self.series = [];
             self.formChart(self.id, []);
             self.chart = jQuery('#' + self.id).highcharts();
             self.refreshSeries(beginTime, endTime);   
         }
-        else if (self.currentDataSource !== self.dataSources.length)
+        else if (self.currentDataSource < self.dataSources.length)
         {
             self.refreshSeries(beginTime, endTime);
         }
@@ -651,8 +683,8 @@ var detailChartRenderer = function()
     me.bindEvents = function()
     {
         var self = this;
-        var chartContainer = document.getElementById(self.id);
-        chartContainer.addEventListener("mousewheel" || "WheelEvent", self.onScrollZoom.bind(self), false);
+        var chartContainer = document.getElementById(self.id);   
+        chartContainer.addEventListener("mousewheel" || "onscroll", self.onScrollZoom.bind(self), false);
         chartContainer.addEventListener('mousedown', self.startDrag.bind(self), false);
         chartContainer.addEventListener('mousemove', self.drag.bind(self), false);
         chartContainer.addEventListener('mouseup', self.stopDrag.bind(self), false);
@@ -949,11 +981,12 @@ var detailChartRenderer = function()
 //            width: 300});
 
         var points = [];        
-        var msg = '<div id="dialog">';
+        var msg = '<div class="ui-dialog">';
         var heightY = chart.chart.plotHeight / 500;        
         var clientY = this.plotY;
         var max = clientY + heightY;
         var min = clientY - heightY;
+        var seriesToMove;
         for(var i = 0; i < chart.chart.series.length; i++)
         {            
             var minx = chart.chart.series[i].xAxis.min;
@@ -968,10 +1001,82 @@ var detailChartRenderer = function()
                 if(date <= (this.x + diffrencex) && date >= (this.x - diffrencex) 
                     && y <= (max) && y >= (min))
                 {
-                    msg = msg + '</br>Channel name: ' + chart.chart.series[i].name + '</br>Date: ' + Highcharts.dateFormat('%Y-%m-%d %H:%M:%S', date) + '</br>Value: ' + value;
+                    seriesToMove = chart.chart.series[i];
+                    msg = msg + '</br><strong>Data source:</strong>' + chart.dataSourcesToChannels[i] +
+                     '</br><strong>Channel:</strong> ' + chart.chart.series[i].name + 
+                     '</br><strong>Date:</strong> ' + Highcharts.dateFormat('%Y-%m-%d %H:%M:%S.%L', date) + 
+                     '</br><strong>Value:</strong> ' + value + '</br>';
                     break;
-                }
+                }           
             }
+        }    
+        var buttons;    
+        if(seriesToMove.yAxis.options.id === 'temporary')
+        {
+           buttons =  {"Delete this series from the temporary axis": function()
+            {
+                var flag;
+                if(seriesToMove.yAxis.series.length === 1)
+                {
+                    flag = true;                  
+                } 
+                var standartAxis = chart.chart.get('standart'); 
+                var color;              
+                if(!standartAxis)
+                {
+                    standartAxis = {gridLineWidth: 0, id: 'standart',labels: {format: '{value}', style: { color: Highcharts.getOptions().colors[0]}}, title: {text: 'Standart axis', style: { color: Highcharts.getOptions().colors[0]}}};
+                    color = standartAxis.labels.style.color;
+                    chart.chart.addAxis(standartAxis, false, false);
+                    chart.axesToShow.push(standartAxis); 
+                }
+                else
+                {
+                    color = standartAxis.options.color;
+                }
+                var jSONSeries = JSON.stringify(seriesToMove.options);
+                var series = JSON.parse(jSONSeries);                    
+                seriesToMove.remove();
+                series.yAxis = 'standart';
+                series.color = color;
+                chart.chart.addSeries(series, true);    
+                var temporaryAxis = chart.chart.get('temporary');
+                if(flag)
+                {
+                    temporaryAxis.remove();                    
+                }              
+            }}                   
+        }
+        else
+        {
+            if(seriesToMove.yAxis.series.length !== 1)
+            {            
+                buttons = {"Show this series on another axes": function()
+                {
+                   
+                    if(seriesToMove.yAxis.options.id === 'temporary')
+                    {
+                        alert("Series is already on temporary axis.");
+                        return;
+                    }
+                    else
+                    {
+                        var temporaryAxis = chart.chart.get('temporary');
+
+                        if(!temporaryAxis)
+                        {
+                            chart.chart.addAxis(chart.temporaryAxis, false, false);
+                            chart.axesToShow.push(chart.temporaryAxis); 
+                        }                      
+                        var jSONSeries = JSON.stringify(seriesToMove.options);
+                        var series = JSON.parse(jSONSeries);
+                        seriesToMove.remove();
+                        series.yAxis = 'temporary';
+                        series.color = chart.temporaryAxis.labels.style.color;
+                        chart.chart.addSeries(series, true);
+                    }
+                                  
+                 }};
+             }
         }
         msg = msg + '</div>';
         jQuery(msg).dialog({
@@ -982,9 +1087,10 @@ var detailChartRenderer = function()
             width: 'auto',
             maxWidth: 1000,
             height: 'auto',
-            close: function() {
+            buttons: buttons
+            /*close: function() {
                 jQuery('#message' + this.x).remove();
-            }
+            }*/
         });
 
     };
@@ -1336,6 +1442,7 @@ var detailChartRenderer = function()
     };
 
     me.axes = me.getAllAxes();
+    me.masterChart.setUpDetailChart(me);
 
     return me;
 

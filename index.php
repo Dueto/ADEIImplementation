@@ -153,7 +153,7 @@ require("module.php");
         <script src="./adei2/graphrenderer/datacaching/webSockets.js"></script>   
       <script src="./adei2/graphrenderer/helpers/dataHandler.js"></script>
      <script src="./adei2/graphrenderer/helpers/dateTimeFormat.js"></script>  
- 	<link rel="stylesheet" type="text/css" href="./adei2/graphrenderer/css/jquery-ui-1.10.4.custom.min_1.css">
+ 	<link rel="stylesheet" type="text/css" href="./adei2/graphrenderer/css/jquery-ui-1.10.4.custom.css">
           <script src="./adei2/graphrenderer/datacaching/dataCacher.js"></script>
              <!--  <script src="./adei2/graphrenderer/datacaching/backgrDataCacher.js"></script>
        
