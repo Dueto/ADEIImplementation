@@ -9,7 +9,9 @@ var masterChartRenderer = function()
     me.dragData = null;
     me.previousStateX = null;
     me.divWidth = null;
-
+    me.dragBordersWidth = 15;
+    me.dragLeftBorder = false;
+    me.dragRightBorder = false;
     me.detailChart = null;
 
     me.renderMasterChar = function(id, series)
@@ -175,7 +177,7 @@ var masterChartRenderer = function()
 
         if(typeof startPoint.plotX !== 'undefined' && typeof endPoint.plotX !== 'undefined')
         {            
-            if(startPoint.plotX <= x && endPoint.plotX >= x)
+            if(startPoint.plotX + self.dragBordersWidth <= x && endPoint.plotX - self.dragBordersWidth >= x)
             {
                 document.body.style.cursor = "move";
                 self.dragData =
@@ -185,12 +187,48 @@ var masterChartRenderer = function()
                     begTime: begTime,
                     endTime: endTime
                 };  
+                self.dragRightBorder = false;
+                self.dragLeftBorder = false;
                 event.cancelBubble = true;
                 event.stopPropagation();
             } 
-            else
+            else if(endPoint.plotX - self.dragBordersWidth <= x && endPoint.plotX >= x)
             {
+                document.body.style.cursor = "e-resize";
+                self.dragData =
+                {
+                    x: event.offsetX,
+                    y: event.offsetY,
+                    begTime: begTime,
+                    endTime: endTime
+                };  
+                self.dragRightBorder = true;
+                self.dragLeftBorder = false;
+                event.cancelBubble = true;
+                event.stopPropagation();
+
+            }
+            else if(startPoint.plotX <= x && startPoint.plotX + self.dragBordersWidth >= x)
+            {
+                document.body.style.cursor = "w-resize";
+                self.dragData =
+                {
+                    x: event.offsetX,
+                    y: event.offsetY,
+                    begTime: begTime,
+                    endTime: endTime
+                };  
+                self.dragRightBorder = false;
+                self.dragLeftBorder = true;
+                event.cancelBubble = true;
+                event.stopPropagation();
+
+            }
+            else
+            {                
                 self.dragData = null;
+                self.dragRightBorder = false;
+                self.dragLeftBorder = false;
                 event.cancelBubble = false;    
             }
         }
@@ -210,7 +248,7 @@ var masterChartRenderer = function()
         var self = this;
         if(self.dragData)
         {
-            for(var i = 0; i < self.detailChart.chart.yAxis.length; i++)
+            /*for(var i = 0; i < self.detailChart.chart.yAxis.length; i++)
             {
                 var yAxis = self.detailChart.chart.yAxis[i];
                 var max = yAxis.getExtremes().dataMax;
@@ -219,7 +257,8 @@ var masterChartRenderer = function()
                 self.detailChart.chart.yAxis[i].options.startOnTick = false;
                 self.detailChart.chart.yAxis[i].options.endOnTick = false;
                 yAxis.setExtremes(min - margin, max + margin);
-            }
+            }*/
+
             event.cancelBubble = true;
             event.stopPropagation();
             var e = event || window.event;            
@@ -237,13 +276,69 @@ var masterChartRenderer = function()
 
             btime = begTime + mapDiffX * multiplier;
             etime = endTime + mapDiffX * multiplier;
-            self.changePlotbands(btime, etime);
-            self.detailChart.zoomChart(btime / 1000, etime / 1000, false);
 
+            if(self.dragLeftBorder)
+            {
+                self.changePlotbands(btime, endTime);
+                self.detailChart.zoomChart(btime / 1000, endTime / 1000, false);
+            } else if(self.dragRightBorder)
+            {
+                self.changePlotbands(begTime, etime);
+                self.detailChart.zoomChart(begTime / 1000, etime / 1000, false);
+            }
+            else
+            {                
+                self.changePlotbands(btime, etime);
+                self.detailChart.zoomChart(btime / 1000, etime / 1000, false);
+            }     
         }
         else
         {
             event.cancelBubble = false;
+            var self = this;
+            var x = event.offsetX - self.chart.plotLeft;
+            var plotBandBefore = self.chart.xAxis[0].plotLinesAndBands[0];
+            var plotBandAfter = self.chart.xAxis[0].plotLinesAndBands[1];
+            var begTime = plotBandBefore.options.to;
+            var endTime = plotBandAfter.options.from;
+            
+            var startPoint;
+            var endPoint;
+            for(var i = 0; i < self.chart.series[0].points.length; i++)     
+            {
+                var date = self.chart.series[0].points[i].x;
+                if(begTime < date)
+                {
+                    startPoint = self.chart.series[0].points[i];
+                    for(var j = i; j < self.chart.series[0].points.length; j++)
+                    {
+                        date = self.chart.series[0].points[j].x;
+                        if(endTime < date)
+                        {
+                            endPoint = self.chart.series[0].points[j];
+                            break;
+                        }
+                    }
+                    break;
+                }
+            }
+            if(startPoint.plotX + self.dragBordersWidth <= x && endPoint.plotX - self.dragBordersWidth >= x)
+            {
+                document.body.style.cursor = "move";                
+            } 
+            else if(endPoint.plotX - self.dragBordersWidth <= x && endPoint.plotX >= x)
+            {
+                document.body.style.cursor = "e-resize"; 
+            }
+            else if(startPoint.plotX <= x && startPoint.plotX + self.dragBordersWidth >= x)
+            {
+                document.body.style.cursor = "w-resize"; 
+            }
+            else
+            {
+                document.body.style.cursor = "initial"; 
+            }
+
         }
 
     };
@@ -256,12 +351,14 @@ var masterChartRenderer = function()
             event.cancelBubble = true;
             event.stopPropagation();
             self.dragData = null;
+            self.dragLeftBorder = false;
+            self.dragRightBorder = false;
             self.previousStateX = null;
             document.body.style.cursor = "default";
             var btime = self.detailChart.chart.xAxis[0].min / 1000;
             var etime = self.detailChart.chart.xAxis[0].max / 1000;            
             self.detailChart.refreshChart(btime, etime);
-            for(var i = 0; i < self.detailChart.chart.yAxis.length; i++)
+            /*for(var i = 0; i < self.detailChart.chart.yAxis.length; i++)
             {
                 var yAxis = self.detailChart.chart.yAxis[i];
                 var max = yAxis.getExtremes().dataMax;
@@ -270,7 +367,7 @@ var masterChartRenderer = function()
                 self.detailChart.chart.yAxis[i].options.startOnTick = false;
                 self.detailChart.chart.yAxis[i].options.endOnTick = false;
                 yAxis.setExtremes(min - margin, max + margin);
-            }
+            }*/
         }
     };
 

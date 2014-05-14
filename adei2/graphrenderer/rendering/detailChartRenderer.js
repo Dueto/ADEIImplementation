@@ -128,9 +128,7 @@ var detailChartRenderer = function()
             self.formAxesInfo(dataSource);
             self.dataSources.push(dataSource);
             self.renderChart(experiment);
-        }     
-        
-
+        }   
     };
 
     me.GetNode = function()
@@ -219,9 +217,10 @@ var detailChartRenderer = function()
                             }                
                             self.chart.xAxis[0].setExtremes(min, max);
                             self.masterChart.changePlotbands(min, max);
-                            self.firstRequest = false;
+                            self.firstRequest = false;                            
                         }
                     }
+                    self.rebuildAxesControls();
 
                 });
             
@@ -346,7 +345,7 @@ var detailChartRenderer = function()
                         enabled: false,
                         shared: true,
                         crosshairs: [{
-                                width: 1,
+                                width: 0.5,
                                 color: 'red',
                                 dashStyle: 'longdash'
                             }],
@@ -360,6 +359,9 @@ var detailChartRenderer = function()
             series: series
         };
         jQuery('#' + id).highcharts(self.chartOptions);
+        self.chart = jQuery('#' + self.id).highcharts();
+       
+        //makeScalabale(Highcharts);
         /* (function(H)
          {
          H.wrap(H.Tooltip.prototype, 'refresh', function(proceed, point, e)
@@ -492,6 +494,7 @@ var detailChartRenderer = function()
             xAxis.setExtremes(beginTime * 1000, endTime * 1000);
             //self.chart.redraw();
             self.currentDataSource = 0;
+            self.rebuildAxesControls();
         }
     };
 
@@ -603,8 +606,9 @@ var detailChartRenderer = function()
             else
             {
                 self.masterChart.changePlotbands(beginTime * 1000, endTime * 1000);
-            }
+            }            
             self.currentDataSource = 0;
+            self.rebuildAxesControls();
         }
     };
 
@@ -697,6 +701,7 @@ var detailChartRenderer = function()
 //
 //            }
 //        }, false);
+
     };
 
     me.changeTooltipPosition = function(event)
@@ -841,6 +846,7 @@ var detailChartRenderer = function()
         var self = this;
         if (self.dragData)
         {
+            self.rebuildAxesControls();
             var btime = self.chart.xAxis[0].min / 1000;
             var etime = self.chart.xAxis[0].max / 1000;
             document.body.style.cursor = "default";
@@ -865,6 +871,7 @@ var detailChartRenderer = function()
             self.chart.yAxis[i].options.endOnTick = false;
             yAxis.setExtremes(min - margin, max + margin);
         }
+        self.rebuildAxesControls();
     };
 
     me.tooltipPosition = function()
@@ -925,6 +932,116 @@ var detailChartRenderer = function()
         
         self.chart.xAxis[0].setExtremes(begTime, endTime);
         self.masterChart.changePlotbands(begTime, endTime);
+
+        self.rebuildAxesControls();
+
+
+};
+
+
+    me.rebuildAxesControls = function()
+    {
+        var self = this;
+        jQuery(".axisControl").remove();
+
+
+        var yAxes = document.getElementsByClassName("highcharts-axis-labels highcharts-yaxis-labels");        
+        for(var i = 0; i < self.chart.yAxis.length; i++)
+        {
+            var axisBox = yAxes[i + 1].getBBox();
+            var yAxis = self.chart.yAxis[i];
+
+            var bBoxWidth = axisBox.width + 20;
+            var bBoxHeight = axisBox.height;
+            var bBoxX = axisBox.x - 10;
+            var bBoxY = axisBox.y;
+
+            labelGroupBBox = self.chart.renderer.rect(bBoxX, bBoxY, bBoxWidth, bBoxHeight)
+            .attr({
+                class: 'axisControl',
+                fill: '#fff',
+                opacity: 0,
+                zIndex: 8
+            })
+            .css({
+                cursor: 'ns-resize'
+            })
+            .add();
+
+            var isDragging = false;
+            var downYValue;
+
+            var rectangles = document.getElementsByClassName('axisControl');
+            
+
+            rectangles[i].onmousedown = function(yAxis)
+            { 
+                return function(e)
+                {   
+                    isDragging = true;
+                    e.cancelBubble = true;
+                    e.stopPropagation();
+                };
+            }(yAxis);
+
+            rectangles[i].onmousemove = function(yAxis)
+            { 
+                return function(e)
+                {    
+                    if (isDragging) 
+                    {                           
+                        if (self.previousStateX === null && self.previousStateY === null)
+                        {                            
+                            self.previousStateY = e.clientY;
+                        }
+                        var mapDiffY = self.previousStateY - e.clientY;
+
+                        var max = yAxis.max;
+                        var min = yAxis.min;
+                        var multiplierY = (max - min) / self.divHieght;
+                        var minY = min - mapDiffY * multiplierY;
+                        var maxY = max - mapDiffY * multiplierY;
+
+                        if(yAxis.oldUserMax !== maxY &&
+                            yAxis.oldUserMin !== minY &&
+                            yAxis.oldMax !== maxY &&
+                            yAxis.oldMin !== minY)
+                        {
+                            yAxis.options.startOnTick = false;
+                            yAxis.options.endOnTick = false;
+                            yAxis.setExtremes(minY, maxY);
+                        } 
+                        self.previousStateY = e.clientY;  
+                    }                
+                                 
+                    
+                };
+            }(yAxis);
+
+            rectangles[i].onmouseup = function(yAxis)
+            { 
+                return function(e)
+                {                
+                    self.rebuildAxesControls();
+                    self.previousStateY = null;
+                    isDragging = false;                        
+                };
+            }(yAxis);
+
+            rectangles[i].ondblclick = function(yAxis)
+            { 
+                return function(e)
+                {                
+                    var extremes = yAxis.getExtremes(),
+                    dataMin = extremes.dataMin,
+                    dataMax = extremes.dataMax;
+                    yAxis.setExtremes(dataMin, dataMax, true, false);
+                };
+            }(yAxis);
+
+
+
+        }
     };
 
     me.showLegend = function()
@@ -951,6 +1068,7 @@ var detailChartRenderer = function()
         }            
         self.chart.xAxis[0].setExtremes(begTime, endTime);
         self.masterChart.changePlotbands(begTime, endTime);
+        self.rebuildAxesControls();
     };
 
     me.showLabels = function(e)
@@ -1020,24 +1138,19 @@ var detailChartRenderer = function()
                 {
                     flag = true;                  
                 } 
-                var standartAxis = chart.chart.get('standart'); 
-                var color;              
+                var standartAxis = chart.chart.get('standart');                            
                 if(!standartAxis)
                 {
                     standartAxis = {gridLineWidth: 0, id: 'standart',labels: {format: '{value}', style: { color: Highcharts.getOptions().colors[0]}}, title: {text: 'Standart axis', style: { color: Highcharts.getOptions().colors[0]}}};
-                    color = standartAxis.labels.style.color;
+                    
                     chart.chart.addAxis(standartAxis, false, false);
                     chart.axesToShow.push(standartAxis); 
-                }
-                else
-                {
-                    color = standartAxis.options.color;
-                }
+                }                
                 var jSONSeries = JSON.stringify(seriesToMove.options);
                 var series = JSON.parse(jSONSeries);                    
                 seriesToMove.remove();
                 series.yAxis = 'standart';
-                series.color = color;
+                series.color = Highcharts.getOptions().colors[0];
                 chart.chart.addSeries(series, true);    
                 var temporaryAxis = chart.chart.get('temporary');
                 if(flag)
@@ -1227,6 +1340,7 @@ var detailChartRenderer = function()
         }            
         self.chart.xAxis[0].setExtremes(begTime, endTime);
         self.masterChart.changePlotbands(begTime, endTime);
+        self.rebuildAxesControls();
     };
 
     me.changeZoomTypeToXY = function()
@@ -1255,6 +1369,7 @@ var detailChartRenderer = function()
         
         self.chart.xAxis[0].setExtremes(begTime, endTime);
         self.masterChart.changePlotbands(begTime, endTime);
+        self.rebuildAxesControls();
 
     };
 
@@ -1416,7 +1531,9 @@ var detailChartRenderer = function()
                     }                    
                     axesObj.id = self.axes[i].value;
                     axesObj.labels.format = axesObj.labels.format + self.axes[i].units;
-                    axesObj.title.text = self.axes[i].name;            
+                    axesObj.title.text = self.axes[i].name;      
+                    axesObj.startOnTick = false;
+                    axesObj.endOnTick = false;      
                     axesToShow.push(axesObj);
                 }
             }

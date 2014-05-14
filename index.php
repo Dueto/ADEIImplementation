@@ -160,7 +160,7 @@ require("module.php");
     <!--   <script type="text/javascript" src="http://ajax.googleapis.com/ajax/libs/jquery/1.8.2/jquery.min.js"></script>  /!-->
         
          <script src="./adei2/graphrenderer/librarys/jquery-1.10.2.js"></script>
-                           <script src="./adei2/graphrenderer/librarys/jquery-ui-1.10.4.custom.js"></script>  
+         <script src="./adei2/graphrenderer/librarys/jquery-ui-1.10.4.custom.js"></script>  
 
 
 
@@ -170,6 +170,9 @@ require("module.php");
 
 <script src="http://code.highcharts.com/highcharts.js"></script>
 <script src="http://code.highcharts.com/modules/exporting.js"></script>
+
+ <script src="./adei2/graphrenderer/librarys/scalable-yaxis.js "></script>  
+
    <script src="./adei2/graphrenderer/rendering/masterChartRenderer.js"></script>
        <script src="./adei2/graphrenderer/rendering/detailChartRenderer.js"></script>
      
