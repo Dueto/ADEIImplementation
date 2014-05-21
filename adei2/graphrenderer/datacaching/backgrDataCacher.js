@@ -2,6 +2,8 @@
 importScripts('../librarys/dataStream.js');
 importScripts('./webSockets.js');
 
+hostURL = 'http://ipecluster5.ipe.kit.edu/ADEIRelease/adei';
+
 self.addEventListener('message', function(e)
 {
     var data = e.data.split('<>');
@@ -188,8 +190,8 @@ function onReadyWork()
     {
         socket.closeSocket();
     }    
-    //console.log('Background: inserting complete');
-    self.close();
+    console.log('Background: complete.');
+    //self.close();
 }
 ;
 
@@ -200,7 +202,7 @@ function onErrorWork(err)
         socket.closeSocket();
     }  
     console.log('Background: ' + err);
-    self.close();
+    //self.close();
 }
 
 function onReadyTransaction()
@@ -216,8 +218,8 @@ function onError(err)
     {
         socket.closeSocket();
     }  
-    //console.log('Background: ' + err.message);
-    self.close();
+    console.log('Background: ' + err.message);
+    //self.close();
 }
 ;
 
@@ -326,7 +328,7 @@ function onReturnResult(req, results)
         if (beginTime === returnedBeginTime && endTime === returnedEndTime)
         {
             //console.log('Background: exist - ' + level);
-            self.close();
+            //self.close();
             return;
         }
         if (returnedBeginTime > beginTime && returnedEndTime === endTime)
@@ -471,7 +473,7 @@ function formatTime(window)
 
 function formURLGetCsv(db_server, db_name, db_group, db_mask, window, level)
 {
-    var url = 'http://ipecluster5.ipe.kit.edu/ADEIRelease/adei/services/getdata.php?db_server=' + db_server
+    var url = hostURL + '/services/getdata.php?db_server=' + db_server
             + '&db_name=' + db_name
             + '&db_group=' + db_group
             + '&db_mask=' + db_mask
@@ -485,7 +487,7 @@ function formURLGetCsv(db_server, db_name, db_group, db_mask, window, level)
 
 function formURLGetBinary(db_server, db_name, db_group, db_mask, window, level)
 {
-    var url = 'http://ipecluster5.ipe.kit.edu/ADEIRelease/adei/services/getdata.php?db_server=' + db_server
+    var url = hostURL + '/services/getdata.php?db_server=' + db_server
             + '&db_name=' + db_name
             + '&db_group=' + db_group
             + '&db_mask=' + db_mask

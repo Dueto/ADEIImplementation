@@ -10,6 +10,8 @@ var dataCacher = function(communicationType, isCache, isCacheDown, isCacheUp, is
     me.isCacheUp = isCacheUp;
     me.isCacheCurrent = isCacheCurrent;
 
+    me.HostURL = 'http://ipecluster5.ipe.kit.edu/ADEIRelease/adei';
+
     me.db = '';
     me.clientsCallback = '';
     me.level = '';
@@ -28,7 +30,7 @@ var dataCacher = function(communicationType, isCache, isCacheDown, isCacheUp, is
         me.isCacheCurrent = false;
     }
     me.getData = function(db_server,
-            db_name,
+            db_name,            
             db_group,
             db_mask,
             window,
@@ -113,7 +115,7 @@ var dataCacher = function(communicationType, isCache, isCacheDown, isCacheUp, is
 
                             self.onReadyFormingRequest();
                         }
-                    }, self.onErrorSql);
+                    }, self.onErrorSql.bind(self));
                 });
             }
             else
@@ -191,10 +193,10 @@ var dataCacher = function(communicationType, isCache, isCacheDown, isCacheUp, is
 
 
                 },
-                        self.onErrorSql);
+                        self.onErrorSql.bind(self));
 
             },
-                    self.onError,
+                    self.onError.bind(self),
                     self.onReadyTransaction);
         }
         else
@@ -375,27 +377,27 @@ var dataCacher = function(communicationType, isCache, isCacheDown, isCacheUp, is
         {
             req.executeSql('CREATE TABLE IF NOT EXISTS DataSource (id INTEGER PRIMARY KEY AUTOINCREMENT,db_server,db_name,db_group, aggregation, level, db_items, labels, datalevels)', [],
                     function(res, rows) {
-                    },
-                    this.onErrorSql);
+                    });
         },
-                this.onError,
+                this.onError.bind(this),
                 this.onReadyTransaction);
     };
 
     me.onReadyTransaction = function()
     {
-        console.log('Transaction completed.');
+        //console.log('Transaction completed.');
     };
 
     me.onError = function(err)
     {
-        console.log(err);
+        alert('Error in caching module: ' + err.message + '\n\n\n To solve this problem, try to clear your cache in browser.');
+        this.openDataBase('DB');
     };
 
     me.onErrorSql = function(asd, err)
     {
-        console.log(err.toString());
-        throw(err);
+        alert('Error in caching module: ' + err.message + '\n\n\n To solve this problem, try to clear your cache in browser.');
+        this.openDataBase('DB');
     };
 
     me.onReadySql = function()
@@ -421,7 +423,7 @@ var dataCacher = function(communicationType, isCache, isCacheDown, isCacheUp, is
 
     me.formURL = function(db_server, db_name, db_group, window, level)
     {
-        var url = 'http://ipecluster5.ipe.kit.edu/ADEIRelease/adei/services/getdata.php?db_server=' + db_server
+        var url = this.HostURL + '/services/getdata.php?db_server=' + db_server
                 + '&db_name=' + db_name
                 + '&db_group=' + db_group
                 + '&db_mask=all'
@@ -434,7 +436,7 @@ var dataCacher = function(communicationType, isCache, isCacheDown, isCacheUp, is
 
     me.formURLList = function(db_server, db_name, db_group, target)
     {
-        var url = 'http://ipecluster5.ipe.kit.edu/ADEIRelease/adei/services/list.php?db_server=' + db_server
+        var url = this.HostURL + '/services/list.php?db_server=' + db_server
                 + '&db_name=' + db_name
                 + '&db_group=' + db_group
                 + '&target=' + target;
@@ -443,7 +445,7 @@ var dataCacher = function(communicationType, isCache, isCacheDown, isCacheUp, is
 
     me.formURLLabel = function(db_server, db_name, db_group, db_mask, target)
     {
-        var url = 'http://ipecluster5.ipe.kit.edu/ADEIRelease/adei/services/list.php?db_server=' + db_server
+        var url = this.HostURL + '/services/list.php?db_server=' + db_server
                 + '&db_name=' + db_name
                 + '&db_group=' + db_group
                 + '&db_mask=' + db_mask
@@ -453,7 +455,7 @@ var dataCacher = function(communicationType, isCache, isCacheDown, isCacheUp, is
 
     me.formURLInfo = function(db_server, db_name, db_group, target)
     {
-        var url = 'http://ipecluster5.ipe.kit.edu/ADEIRelease/adei/services/info.php?db_server=' + db_server
+        var url = this.HostURL + '/services/info.php?db_server=' + db_server
                 + '&db_name=' + db_name
                 + '&db_group=' + db_group
                 + '&target=' + target;
@@ -589,7 +591,7 @@ var dataCacher = function(communicationType, isCache, isCacheDown, isCacheUp, is
 
     me.formURLGetCsv = function(db_server, db_name, db_group, db_mask, window, level)
     {
-        var url = 'http://ipecluster5.ipe.kit.edu/ADEIRelease/adei/services/getdata.php?db_server=' + db_server
+        var url = this.HostURL + '/services/getdata.php?db_server=' + db_server
                 + '&db_name=' + db_name
                 + '&db_group=' + db_group
                 + '&db_mask=' + db_mask
@@ -602,7 +604,7 @@ var dataCacher = function(communicationType, isCache, isCacheDown, isCacheUp, is
 
     me.formURLGetBinary = function(db_server, db_name, db_group, db_mask, window, level)
     {
-        var url = 'http://ipecluster5.ipe.kit.edu/ADEIRelease/adei/services/getdata.php?db_server=' + db_server
+        var url = this.HostURL + '/services/getdata.php?db_server=' + db_server
                 + '&db_name=' + db_name
                 + '&db_group=' + db_group
                 + '&db_mask=' + db_mask
@@ -618,7 +620,7 @@ var dataCacher = function(communicationType, isCache, isCacheDown, isCacheUp, is
 
     if (me.communicationType === 'websockets')
     {
-        me.webSocket = new webSockets('ws://ipecluster5.ipe.kit.edu:12345');
+        me.webSocket = new webSockets('ws://katrin.kit.edu:12345');
         me.webSocket.openSocket();
         me.webSocket.setOnOpenCallback(me.onOpenSocket);
         me.webSocket.setOnCloseCallback(me.onCloseSocket);

@@ -168,11 +168,9 @@ require("module.php");
          <script src="./adei2/graphrenderer/modules/data.js"></script>
          <script src="./adei2/graphrenderer/modules/exporting.js"></script>/!-->
 
+<!-- <script src="./adei2/graphrenderer/librarys/highstock.js"></script>/!-->
 <script src="http://code.highcharts.com/highcharts.js"></script>
 <script src="http://code.highcharts.com/modules/exporting.js"></script>
-
- <script src="./adei2/graphrenderer/librarys/scalable-yaxis.js "></script>  
-
    <script src="./adei2/graphrenderer/rendering/masterChartRenderer.js"></script>
        <script src="./adei2/graphrenderer/rendering/detailChartRenderer.js"></script>
      

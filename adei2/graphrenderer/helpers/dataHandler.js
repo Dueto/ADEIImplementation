@@ -41,9 +41,9 @@ var dataHandler = function(communicationType)
             if (level.window == 0)
             {
                 aggregation = 'v';
-            }
-            var worker = new Worker('/ADEIRelease/adei/adei2/graphrenderer/datacaching/backgrDataCacher.js');
-            this.backCachers.push(worker);
+            }        
+            var worker = new Worker('/ADEIRelease/adei/adei2/graphrenderer/datacaching/backgrDataCacher.js');  
+            this.backCachers.push(worker);           
             worker.postMessage(this.db_server + '<>'
                     + this.db_name + '<>'
                     + this.db_group + '<>'

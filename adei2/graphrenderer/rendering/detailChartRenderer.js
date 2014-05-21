@@ -8,12 +8,16 @@ var detailChartRenderer = function()
     me.id = 'detailChart';
     me.chart = null;
 
+    me.hostURL = 'http://ipecluster5.ipe.kit.edu/ADEIRelease/adei'
+
     me.axes = '';
     me.axesToShow = [];
     
     me.neddenAxes = [];
     me.axesToChannels = [];
     me.dataSourcesToChannels = [];
+
+    me.stopPropagation = false;
 
     me.temporaryAxis = {gridLineWidth: 0, id: 'temporary',labels: {format: '{value}', style: { color: 'black'}}, title: {text: 'Temporary axis', style: { color: 'black'}}};
 
@@ -37,8 +41,10 @@ var detailChartRenderer = function()
     me.chartOptions = '';
     me.isLegendEnabled = false;
     me.firstRequest = false;
-    me.needenWindow = 0;
+    me.needenWindow = '-';
 
+    me.resetXAxisAfterRenderTime = false;
+    me.resetYAxisAfterRenderTime = false;
     me.previousStateX = null;
     me.previousStateY = null;
 
@@ -56,7 +62,7 @@ var detailChartRenderer = function()
     me.Request = function(cfg)
     {
         var self = this;        
-        self.dataSources = [];
+        //self.dataSources = [];
         var dataSource = {};
         dataSource.db_server = cfg.db_server;
         dataSource.db_name = cfg.db_name;
@@ -67,29 +73,36 @@ var detailChartRenderer = function()
         if(dataSource.aggregation === null)
         {
             dataSource.aggregation = 'mean';
-        }      
-        me.axesToShow = [];        
+        }       
         if(parseInt(cfg.window) !== 0)
         {
-            self.needenWindow = (cfg.window);      
-            self.firstRequest = true;      
-        }
-        if(dataSource.db_server === 'virtual' && dataSource.db_name === 'srctree')
+            self.needenWindow = (cfg.window);  
+        } 
+        self.pointCount = self.divWidth * self.resolutionMultiplier;
+        self.onDraggingRigth = self.divWidth - self.onDraggingLeft;
+        self.bindEvents();
+        self.masterChart.bindEvents();
+        self.masterChart.setOnZoomCallback(self.onZoomMasterChartEvent.bind(self));         
+        if(self.chart !== null && self.masterChart !== null && self.masterChart.chart !== null)
         {
+            self.resizeCharts();
             self.divWidth = self.getDivWidth(self.id);
             self.divHieght = self.getDivHieght(self.id);
-            self.pointCount = self.divWidth * self.resolutionMultiplier;
-            self.onDraggingRigth = self.divWidth - self.onDraggingLeft;
-            self.bindEvents();
-            self.masterChart.bindEvents();
-            self.masterChart.setOnZoomCallback(self.onZoomMasterChartEvent.bind(self));
+            self.masterChart.recalculateDivSizes();
+        } 
+        if(dataSource.db_server === 'virtual' && dataSource.db_name === 'srctree')
+        {            
             var srctree = cfg.srctree.split(',');
             var virtualSources = self.formVirtualSources(srctree);
-                         
+            if(self.isPriviousRequest(virtualSources))
+            {
+                return;
+            }
+            else{self.dataSources = [];self.axesToShow = []; self.firstRequest = true; }          
             var min = 9999999999999999;
             var max = 0;                
             for (var i = 0; i < virtualSources.length; i++) 
-            {                 
+            { 
                 self.formAxesInfo(virtualSources[i]);
                 if(experiment === '-' || experiment === '*-*')
                 { 
@@ -110,44 +123,32 @@ var detailChartRenderer = function()
                     min = experiment.split('-')[1];
                     max = experiment.split('-')[0];
                 }
-            } 
-            
-                
+            }
             self.dataSources = virtualSources;
-            self.refreshChartFromMasterChart(max, min);
-
-           
+            if(!self.stopPropagation)
+            {
+                self.refreshChartFromMasterChart(max, min);
+            }            
         }
         else
-        {  
+        {   
+            if(self.isPriviousRequest([dataSource]))
+            {
+                return;
+            }
+            else{self.dataSources = []; self.firstRequest = true;self.axesToShow = [];}           
             if(experiment === '-' || experiment === '*-*')
             {
                 experiment = self.getExperimentInterval(dataSource);
-            }             
-            
+            }  
             self.formAxesInfo(dataSource);
             self.dataSources.push(dataSource);
             self.renderChart(experiment);
+            self.setChartTitle();
         }   
     };
 
-    me.GetNode = function()
-    {
-
-    };
-
-    me.attachEvent = function(event, responder)
-    {
-
-    };
-
-    me.dispatchEvent = function(event)
-    {
-
-    };
-
-    me
-    .renderChart = function(experiment)
+    me.renderChart = function(experiment)
     {
         var self = this;       
         self.divWidth = self.getDivWidth(self.id);
@@ -232,11 +233,22 @@ var detailChartRenderer = function()
 
     };
 
+    jQuery(window).resize(function() 
+    {   
+        chart.resizeCharts();        
+        chart.masterChart.recalculateDivSizes();        
+        chart.divWidth = chart.getDivWidth(chart.id);
+        chart.divHieght = chart.getDivHieght(chart.id);
+    });
 
     me.formChart = function(id, series, yAxises)
     {
         var self = this;
         var title = self.formTitle();
+        for(var i = 0; i < series.length; i++)
+        {
+    	    series[i].lineWidth = 1;
+        }
         self.chartOptions = {
             chart:
                     {                        
@@ -268,7 +280,7 @@ var detailChartRenderer = function()
             xAxis:
                     {
                         type: 'datetime',
-                        gridLineWidth: 1
+                        gridLineWidth: 0.5
                     },
             legend:
                     {
@@ -286,10 +298,11 @@ var detailChartRenderer = function()
                         align: 'right',
                         verticalAlign: 'top',
                         layout: 'vertical',
-                        y: 30,
-                        x: -self.onDraggingLeft,
+                        y: 35,
+                        x: -self.onDraggingLeft - 80,
                         symbolHeight: 20,
-                        floating: false
+                        floating: false,
+                        marginRight: 100,
                     },
             plotOptions:
                     {
@@ -331,7 +344,9 @@ var detailChartRenderer = function()
                                             {
                                                 hover:
                                                         {
-                                                            lineWidth: 2
+                                                    	    enabled: true,
+                                                    	    lineWidth: 1
+                                                            
                                                         }
                                             },
                                     threshold: null,
@@ -356,10 +371,71 @@ var detailChartRenderer = function()
                         xDateformat: '%Y-%m-%d<br/>%H:%M',
                         positioner: self.tooltipPosition.bind(self)
                     },
-            series: series
+            series: series,
+            exporting: 
+            {
+                buttons: 
+                {                    
+                    menu: {
+                        x: -70,
+                        symbol: 'circle',
+                        menuItems: [
+                        {
+                            onclick: self.hideLegend.bind(self),
+                            text: 'Hide legend'      
+                        },
+                        {
+                            onclick: self.showLegend.bind(self),
+                            text: 'Show legend',   
+                        },
+                        {
+                            onclick: self.changeZoomTypeToMap.bind(self),
+                            text: 'To map manipulation', 
+                        },
+                        {
+                            onclick: self.changeZoomTypeToXY.bind(self),
+                            text: 'To XY zoom type', 
+                        }]
+                                           
+                    },                   
+                    zoomInButton: {
+                        x: -80,
+                        y: 70,
+                        onclick: self.zoomIn.bind(self),
+                        text: 'Zoom in',  
+                        theme: 
+                        {
+                            zIndex: 20
+                        },                           
+                    },
+                    zoomOutButton: {
+                        x: -80,
+                        y: 100,
+                        onclick: self.zoomOut.bind(self),
+                        text: 'Zoom out',   
+                        theme: 
+                        {
+                            zIndex: 20
+                        },  
+                    }
+                    
+                }
+            }
         };
         jQuery('#' + id).highcharts(self.chartOptions);
         self.chart = jQuery('#' + self.id).highcharts();
+        var sourceWidth;
+        if(document.getElementById('main_sidebar_source').offsetWidth > document.getElementById('main_sidebar_controls').offsetWidth)
+        {sourceWidth = document.getElementById('main_sidebar_source').offsetWidth;}
+        else{sourceWidth = document.getElementById('main_sidebar_controls').offsetWidth}
+        self.chart.setSize
+        (
+            jQuery(window).width() - sourceWidth, 
+            jQuery(window).height() - document.getElementById('header_div').offsetHeight - 100  - 50,
+            false
+        ); 
+        self.divWidth = self.getDivWidth(self.id);
+        self.divHieght = self.getDivHieght(self.id);
        
         //makeScalabale(Highcharts);
         /* (function(H)
@@ -386,8 +462,33 @@ var detailChartRenderer = function()
         {
             var begTime = event.xAxis[0].min / 1000;
             var endTime = event.xAxis[0].max / 1000;
+            var prevBegTime = event.xAxis[0].axis.min / 1000;
+            var prevEndTime = event.xAxis[0].axis.max / 1000;
+            var max = event.yAxis[0].max;
+            var min = event.yAxis[0].min;
+            var prevMin = event.yAxis[0].axis.min;
+            var prevMax = event.yAxis[0].axis.max;
+            var diffY = (max - min) / self.divHieght;
+            var diffX = (endTime - begTime) / self.divWidth;
+            var prevDiffY = (prevMax - prevMin) / self.divHieght;
+            var prevDiffX = (prevEndTime - prevBegTime) / self.divWidth;
+            if(diffY <= prevDiffY / 30)
+            {
+                self.resetXAxisAfterRenderTime = false;
+                self.resetYAxisAfterRenderTime = true;
+            }
+            if(diffX <= prevDiffX / 30)
+            {
+                self.resetXAxisAfterRenderTime = true;
+                self.resetYAxisAfterRenderTime = false;
+                begTime = prevBegTime;
+                endTime = prevEndTime;             
+            }
             self.masterChart.changePlotbands(begTime * 1000, endTime * 1000);
-            self.refreshChart(begTime, endTime);
+            if(!self.stopPropagation)
+            {
+                self.refreshChart(begTime, endTime);
+            }
         }
         else
         {
@@ -406,7 +507,10 @@ var detailChartRenderer = function()
         endTime = (endTime.toString()).split('.')[0];
         self.initialBeginTime = begTime;
         self.initialEndTime = endTime;
-        self.refreshChartFromMasterChart(begTime, endTime);
+        if(!self.stopPropagation)
+        {
+            self.refreshChartFromMasterChart(begTime, endTime); 
+        }        
     };
 
 
@@ -427,6 +531,7 @@ var detailChartRenderer = function()
                 if (obj === null)
                 {
                     self.currentDataSource++;
+                    self.series.push([]);
                     self.refreshChart(beginTime, endTime);
                     console.log('No data in server responces.');
                     //alert('No data in server responces.');
@@ -437,11 +542,7 @@ var detailChartRenderer = function()
                     for (var i = 0; i < obj.data.length; i++)
                     {
                         var series = self.parseData(obj, i); 
-                        self.series.push(series);                            
-                        /*self.dataSourcesToChannels.push(self.dataSources[self.currentDataSource].db_server  + ' '
-                        + self.dataSources[self.currentDataSource].db_name  + ' ' 
-                        + self.dataSources[self.currentDataSource].db_group);*/
-
+                        self.series.push(series);  
                     }
                     self.currentDataSource++;
                     self.refreshChart(beginTime, endTime);
@@ -460,13 +561,10 @@ var detailChartRenderer = function()
 
     me.refreshChart = function(beginTime, endTime)
     {
-        var self = this;
+        var self = this;        
         if (self.currentDataSource === 0)
-        {
-            /*if(self.chart.series.length !== self.dataSourcesToChannels.length)
-            {
-                self.dataSourcesToChannels = []; 
-            }*/
+        {        
+            self.stopPropagation = true;   
             self.series = [];       
             self.refreshZoomSeries(beginTime, endTime);
         }
@@ -475,27 +573,51 @@ var detailChartRenderer = function()
             self.refreshZoomSeries(beginTime, endTime);
         }
         else
-        {
-            var title = self.formTitle();
-            self.chart.setTitle({text: title});            
-            for (var i = 0; i < self.series.length; i++)
+        {                      
+            
+            self.setUpNewSeries();
+            var xAxis = self.chart.xAxis[0];
+            xAxis.setExtremes(beginTime * 1000, endTime * 1000, false);
+            //self.chart.redraw();
+            if(self.resetYAxisAfterRenderTime)
             {
-                if(typeof self.chart.series[i] !== 'undefined')
-                {                    
-                    self.chart.series[i].setData(self.series[i].data);                                     
+                self.resetYAxis();
+                self.resetYAxisAfterRenderTime = false;
+            }            
+            self.currentDataSource = 0;
+            self.chart.redraw();
+            self.rebuildAxesControls();
+            self.stopPropagation = false;
+            self.setChartTitle();
+        }         
+    };
+
+    me.setChartTitle = function()
+    {
+        var self = this;
+        var title = self.formTitle();
+        self.chart.setTitle({text: title}); 
+    };
+
+    me.setUpNewSeries = function()
+    {
+        var self = this;
+        for (var i = 0; i < self.series.length; i++)            
+        {
+            for(var j = 0; j < self.chart.series.length; j++)
+            {
+                if(typeof self.chart.series[j] !== 'undefined' && self.chart.series[j].name === self.series[i].name)
+                {   
+                    self.chart.series[j].setData(self.series[i].data, false, false);                                     
                 }    
                 else if(self.series.length > self.chart.series.length)
                 {
-                    self.addSeries(self.series[i], false);  
+                    self.series[i].lineWidth = 1;
+                    self.chart.addSeries(self.series[i], false);  
                 }            
-            }
-            
-            var xAxis = self.chart.xAxis[0];
-            xAxis.setExtremes(beginTime * 1000, endTime * 1000);
-            //self.chart.redraw();
-            self.currentDataSource = 0;
-            self.rebuildAxesControls();
+            }            
         }
+
     };
 
     me.refreshSeries = function(beginTime, endTime)
@@ -512,7 +634,7 @@ var detailChartRenderer = function()
                 {
                     self.currentDataSource++;
                     self.refreshChartFromMasterChart(beginTime, endTime);
-                    self.addSeries({data: [], name: '', pointInterval: self.dataSourceLevel * 1000}, false);
+                    //self.addSeries({data: [], name: '', pointInterval: self.dataSourceLevel * 1000}, false);                   
                     self.dataSourcesToChannels.push(self.dataSources[self.currentDataSource].db_server  + ' '
                         + self.dataSources[self.currentDataSource].db_name  + ' ' 
                         + self.dataSources[self.currentDataSource].db_group);
@@ -526,7 +648,7 @@ var detailChartRenderer = function()
                     {             
                         var series = self.parseData(obj, i);
                         series.dataSource = self.dataSources[self.currentDataSource].db_server + ' ' + self.dataSources[self.currentDataSource].db_name + ' ' + self.dataSources[self.currentDataSource].db_group;
-                        self.addSeries(series, false);
+                        self.addSeries(series, false);                       
                         self.dataSourcesToChannels.push(self.dataSources[self.currentDataSource].db_server  + ' '
                         + self.dataSources[self.currentDataSource].db_name  + ' ' 
                         + self.dataSources[self.currentDataSource].db_group);
@@ -538,24 +660,25 @@ var detailChartRenderer = function()
 
         }
         catch (ex)
-        {              
+        {     
+            self.currentDataSource++;
+            self.refreshChartFromMasterChart(beginTime, endTime);
+            //self.addSeries({data: [], name: '', pointInterval: self.dataSourceLevel * 1000}, false);
+            self.dataSourcesToChannels.push(self.dataSources[self.currentDataSource].db_server  + ' '
+                + self.dataSources[self.currentDataSource].db_name  + ' ' 
+                + self.dataSources[self.currentDataSource].db_group);         
             console.log(ex);
         }
     };
 
     me.refreshChartFromMasterChart = function(beginTime, endTime)
     {
-        var self = this;
+        var self = this;       
         if (self.currentDataSource === 0)
         {            
-            if(self.chart !== null)
-            {
-                self.chart.destroy();               
-            }         
-            self.dataSourcesToChannels = [];
-            self.series = [];
-            self.formChart(self.id, []);
-            self.chart = jQuery('#' + self.id).highcharts();
+            self.stopPropagation = true;
+            self.dispose();       
+            self.formChartWithEmptySeries();
             self.refreshSeries(beginTime, endTime);   
         }
         else if (self.currentDataSource < self.dataSources.length)
@@ -563,53 +686,70 @@ var detailChartRenderer = function()
             self.refreshSeries(beginTime, endTime);
         }
         else
-        {        
-            self.chart.redraw();
-            var max = self.chart.xAxis[0].max;
-            var min = self.chart.xAxis[0].min;
-            if(self.firstRequest === true)
-            {                
-                if(typeof self.needenWindow.split('-')[1] !== 'undefined')
-                {
-                    var minWindow = parseInt(self.needenWindow.split('-')[0]) * 1000;
-                    var maxWindow = parseInt(self.needenWindow.split('-')[1]) * 1000;
-                    if(minWindow >= min && maxWindow <= max && minWindow < maxWindow)
-                    {
-                        min = minWindow;
-                        max = maxWindow;
-                    }
-                }
-                else
-                {
-                    var diffrence = max - min;                    
-                    if(diffrence > (parseInt(self.needenWindow) * 1000))
-                    {
-                        min = max - parseInt(self.needenWindow) * 1000;
-                    }
-                }  
-                self.chart.xAxis[0].setExtremes(min, max);     
-                self.firstRequest = false;           
-                if(self.masterChart.chart !== null)
-                {
-                    self.masterChart.chart.destroy();
-                    self.masterChart.series = [];
-                }                
-            }
-            if(self.masterChart.series.length === 0)
-            {
-                var masterSeries = {};
-                masterSeries.data = self.series[0].data;
-                masterSeries.name = self.series[0].name;
-                self.masterChart.renderMasterChar(self.masterChartId, masterSeries);  
-                self.masterChart.changePlotbands(min, max);              
-            }      
-            else
-            {
-                self.masterChart.changePlotbands(beginTime * 1000, endTime * 1000);
-            }            
+        {   
+            self.afterGettingData();
             self.currentDataSource = 0;
-            self.rebuildAxesControls();
+            self.stopPropagation = false;
+            self.setChartTitle();
+        }               
+    };
+
+    me.afterGettingData = function()
+    {
+        var self = this;  
+        self.chart.redraw();              
+        if(self.firstRequest === true)
+        {  
+            self.setXAxisWithNeedenWindow();      
+            self.refreshMasterChart(self.chart.xAxis[0].min, self.chart.xAxis[0].max);                     
+            self.firstRequest = false;               
+        }        
+        //self.chart.redraw();
+        self.rebuildAxesControls(); 
+    };
+
+    me.setXAxisWithNeedenWindow = function()
+    {
+        var self = this;
+        var max = self.chart.xAxis[0].max;
+        var min = self.chart.xAxis[0].min;              
+        if(typeof self.needenWindow.split('-')[1] !== 'undefined')
+        {
+            var minWindow = parseInt(self.needenWindow.split('-')[0]) * 1000;
+            var maxWindow = parseInt(self.needenWindow.split('-')[1]) * 1000;
+            if(minWindow >= min && maxWindow <= max && minWindow < maxWindow)
+            {
+                min = minWindow;
+                max = maxWindow;
+            }
         }
+        else
+        {
+            var diffrence = max - min;                    
+            if(diffrence > (parseInt(self.needenWindow) * 1000))
+            {
+                min = max - parseInt(self.needenWindow) * 1000;
+            }
+        }  
+
+        self.chart.xAxis[0].setExtremes(min, max);    
+    };
+
+    me.refreshMasterChart = function(beginTime, endTime)
+    {
+        var self = this;
+        if(self.masterChart.chart !== null)
+        {
+            self.masterChart.dispose();
+        }
+        if(self.masterChart.series.length === 0)
+        {
+            var masterSeries = {};
+            masterSeries.data = self.series[0].data;
+            masterSeries.name = self.series[0].name;
+            self.masterChart.renderMasterChar(self.masterChartId, masterSeries);                            
+        }      
+        self.masterChart.changePlotbands(beginTime, endTime);
     };
 
     me.parseData = function(obj, i)
@@ -624,9 +764,10 @@ var detailChartRenderer = function()
         {
             if(self.dataSources[self.currentDataSource].axesToChannels[k].channelName === name)
             {
-                if(self.dataSources[self.currentDataSource].axesToChannels[k].value !== null)
+                series.channelNumber =  self.dataSources[self.currentDataSource].axesToChannels[k].channelNumber; 
+                if(self.dataSources[self.currentDataSource].axesToChannels[k].currentAxis !== null)
                 {
-                    series.yAxis = self.dataSources[self.currentDataSource].axesToChannels[k].value;
+                    series.yAxis = self.dataSources[self.currentDataSource].axesToChannels[k].currentAxis;                                       
                 }      
                 else
                 {
@@ -635,14 +776,20 @@ var detailChartRenderer = function()
                 break;
             }                      
         }        
-
-        series.color = self.chart.get(series.yAxis).options.labels.style.color;
-
+	
+    	if(series.yAxis !== 0)
+    	{
+    	    series.color = self.chart.get(series.yAxis).options.labels.style.color;    
+    	}
+    	else
+    	{
+    	    series.color = self.chart.yAxis[0].options.labels.style.color;
+    	}               
         for (var j = 0; j < obj.data[i].length; j++)
         {
-            var pointData = obj.data[i][j];
+            var pointData = obj.data[i][j];            
             series.data[j] = [];  
-            series.data[j].push(parseFloat(obj.dateTime[j]) * 1000);
+            series.data[j].push(parseFloat(obj.dateTime[j]) * 1000);            
             series.data[j].push(pointData);
         }
 
@@ -662,8 +809,11 @@ var detailChartRenderer = function()
         {
             self.timer = setTimeout(function()
             {
-                self.refreshChart(beginTime, endTime);
-            }, 300);
+                if(!self.stopPropagation)
+                {
+                    self.refreshChart(beginTime, endTime);
+                }                
+            }, 100);
         }
               
     };
@@ -681,6 +831,23 @@ var detailChartRenderer = function()
         var endTime = etime - (diffrence * self.delta);
         self.delta = 0;
         self.zoomChart(begTime, endTime, true);
+
+    };
+
+    me.zoomIn = function()
+    {
+        var self = this;
+        var beginTime = self.chart.xAxis[0].min + ((self.chart.xAxis[0].max - self.chart.xAxis[0].min) / 4);
+        var endTime = self.chart.xAxis[0].max - ((self.chart.xAxis[0].max - self.chart.xAxis[0].min) / 4);
+        self.zoomChart(beginTime / 1000, endTime / 1000, true);
+    };
+
+    me.zoomOut = function()
+    {
+        var self = this;
+        var beginTime = self.chart.xAxis[0].min - ((self.chart.xAxis[0].max - self.chart.xAxis[0].min) / 4);
+        var endTime = self.chart.xAxis[0].max + ((self.chart.xAxis[0].max - self.chart.xAxis[0].min) / 4);
+        self.zoomChart(beginTime / 1000, endTime / 1000, true);
 
     };
 
@@ -850,7 +1017,10 @@ var detailChartRenderer = function()
             var btime = self.chart.xAxis[0].min / 1000;
             var etime = self.chart.xAxis[0].max / 1000;
             document.body.style.cursor = "default";
-            self.refreshChart(btime, etime);
+            if(!self.stopPropagation)
+            {
+                self.refreshChart(btime, etime);
+            }            
             self.dragData = null;
             self.previousStateX = null;
             self.previousStateY = null;
@@ -869,8 +1039,9 @@ var detailChartRenderer = function()
             var margin = (max - min) / 10;
             self.chart.yAxis[i].options.startOnTick = false;
             self.chart.yAxis[i].options.endOnTick = false;
-            yAxis.setExtremes(min - margin, max + margin);
+            yAxis.setExtremes(min - margin, max + margin, false);
         }
+        self.chart.redraw();
         self.rebuildAxesControls();
     };
 
@@ -927,12 +1098,12 @@ var detailChartRenderer = function()
         {
             self.chart.yAxis[i].options.startOnTick = false;
             self.chart.yAxis[i].options.endOnTick = false;
-            self.chart.yAxis[i].setExtremes(min[i], max[i]);
+            self.chart.yAxis[i].setExtremes(min[i], max[i], false);
         }    
         
-        self.chart.xAxis[0].setExtremes(begTime, endTime);
+        self.chart.xAxis[0].setExtremes(begTime, endTime, false);        
         self.masterChart.changePlotbands(begTime, endTime);
-
+        self.chart.redraw();
         self.rebuildAxesControls();
 
 
@@ -944,17 +1115,16 @@ var detailChartRenderer = function()
         var self = this;
         jQuery(".axisControl").remove();
 
-
         var yAxes = document.getElementsByClassName("highcharts-axis-labels highcharts-yaxis-labels");        
         for(var i = 0; i < self.chart.yAxis.length; i++)
         {
             var axisBox = yAxes[i + 1].getBBox();
             var yAxis = self.chart.yAxis[i];
 
-            var bBoxWidth = axisBox.width + 20;
-            var bBoxHeight = axisBox.height;
-            var bBoxX = axisBox.x - 10;
-            var bBoxY = axisBox.y;
+            bBoxWidth = axisBox.width + 20;
+            bBoxHeight = axisBox.height;
+            bBoxX = axisBox.x - 10;
+            bBoxY = axisBox.y;
 
             labelGroupBBox = self.chart.renderer.rect(bBoxX, bBoxY, bBoxWidth, bBoxHeight)
             .attr({
@@ -969,22 +1139,45 @@ var detailChartRenderer = function()
             .add();
 
             var isDragging = false;
+            var isDraggingMaxExtreme = false;
+            var isDraggingMinExtreme = false;
             var downYValue;
 
             var rectangles = document.getElementsByClassName('axisControl');
-            
+            var rect = rectangles[i];
+            var downYValue;
 
-            rectangles[i].onmousedown = function(yAxis)
+            rectangles[i].onmousedown = function(yAxis, rect)
             { 
                 return function(e)
                 {   
-                    isDragging = true;
-                    e.cancelBubble = true;
-                    e.stopPropagation();
+                    isDragging = true;  
+                    if(self.zoomType !== 'xy')
+                    {
+                        e.cancelBubble = true;
+                        e.stopPropagation();
+                    }   
+                    /*var higherPosition = rect.getBBox().height / 2 - 100;
+                    var downPosition = higherPosition + 200;
+                    if(e.offsetY < higherPosition)
+                    {
+                        isDraggingMaxExtreme = true;       
+                        isDraggingMinExtreme = false;                 
+                    }
+                    else if(e.offsetY > downPosition)
+                    {
+                        isDraggingMinExtreme = true;
+                        isDraggingMaxExtreme = false;
+                    }
+                    else
+                    {
+                        isDraggingMaxExtreme = false;
+                        isDraggingMinExtreme = false;
+                    } */                
                 };
-            }(yAxis);
+            }(yAxis, rect);
 
-            rectangles[i].onmousemove = function(yAxis)
+            rectangles[i].onmousemove = function(yAxis, rect)
             { 
                 return function(e)
                 {    
@@ -998,37 +1191,68 @@ var detailChartRenderer = function()
 
                         var max = yAxis.max;
                         var min = yAxis.min;
+                        if(self.divHieght === 0)
+                        {self.divHieght = 800;}
                         var multiplierY = (max - min) / self.divHieght;
                         var minY = min - mapDiffY * multiplierY;
-                        var maxY = max - mapDiffY * multiplierY;
+                        var maxY = max - mapDiffY * multiplierY;    
+
+                        /*extremes = yAxis.getExtremes(),
+                        userMin = extremes.userMin,
+                        userMax = extremes.userMax,
+                        dataMin = extremes.dataMin,
+                        dataMax = extremes.dataMax,
+
+                        minimum = userMin !== undefined ? userMin : dataMin,
+                        maximum = userMax !== undefined ? userMax : dataMax;*/
 
                         if(yAxis.oldUserMax !== maxY &&
                             yAxis.oldUserMin !== minY &&
                             yAxis.oldMax !== maxY &&
                             yAxis.oldMin !== minY)
                         {
-                            yAxis.options.startOnTick = false;
-                            yAxis.options.endOnTick = false;
-                            yAxis.setExtremes(minY, maxY);
+                            /*if(isDraggingMinExtreme)
+                            {
+                                yAxis.options.startOnTick = false;
+                                yAxis.options.endOnTick = false;
+                                minY = minY > dataMin ? minY : dataMin;
+                                yAxis.setExtremes(minY, max, true, false);
+                            } else if(isDraggingMaxExtreme)
+                            {
+                                yAxis.options.startOnTick = false;
+                                yAxis.options.endOnTick = false;
+                                maxY = maxY > dataMax ? maxY : dataMax;                                
+                                yAxis.setExtremes(min, maxY, true, false);
+                            }
+                            else 
+                            {*/
+                                yAxis.options.startOnTick = false;
+                                yAxis.options.endOnTick = false;
+                                yAxis.setExtremes(minY, maxY, true, false);
+                        //    }                            
                         } 
+
+                    }
                         self.previousStateY = e.clientY;  
-                    }                
+                                    
                                  
                     
                 };
-            }(yAxis);
+            }(yAxis, rect);
 
-            rectangles[i].onmouseup = function(yAxis)
+            rectangles[i].onmouseup = function(yAxis, rect)
             { 
                 return function(e)
                 {                
                     self.rebuildAxesControls();
                     self.previousStateY = null;
-                    isDragging = false;                        
+                    isDragging = false;    
+                    isDraggingMinExtreme = false;
+                    isDraggingMaxExtreme = false;                    
                 };
-            }(yAxis);
+            }(yAxis, rect);
 
-            rectangles[i].ondblclick = function(yAxis)
+            rectangles[i].ondblclick = function(yAxis, rect)
             { 
                 return function(e)
                 {                
@@ -1037,11 +1261,30 @@ var detailChartRenderer = function()
                     dataMax = extremes.dataMax;
                     yAxis.setExtremes(dataMin, dataMax, true, false);
                 };
-            }(yAxis);
+            }(yAxis, rect);
 
 
 
         }
+    };
+
+    me.resizeCharts = function()
+    {
+        var self = this;
+        var sourceWidth;
+        if(document.getElementById('main_sidebar_source').offsetWidth > document.getElementById('main_sidebar_controls').offsetWidth)
+        {sourceWidth = document.getElementById('main_sidebar_source').offsetWidth;}
+        else{sourceWidth = document.getElementById('main_sidebar_controls').offsetWidth}
+        self.chart.setSize(
+            jQuery(window).width() - sourceWidth, 
+            jQuery(window).height() - document.getElementById('header_div').offsetHeight - 100  - 50,
+            true
+        ); 
+        self.masterChart.chart.setSize(
+            jQuery(window).width() - sourceWidth,
+            100
+        );
+        self.masterChart.rebuildControls(jQuery(window).width() - sourceWidth);
     };
 
     me.showLegend = function()
@@ -1064,10 +1307,11 @@ var detailChartRenderer = function()
         {
             self.chart.yAxis[i].options.startOnTick = false;
             self.chart.yAxis[i].options.endOnTick = false;
-            self.chart.yAxis[i].setExtremes(min[i], max[i]);
+            self.chart.yAxis[i].setExtremes(min[i], max[i], false);
         }            
-        self.chart.xAxis[0].setExtremes(begTime, endTime);
+        self.chart.xAxis[0].setExtremes(begTime, endTime, false);
         self.masterChart.changePlotbands(begTime, endTime);
+        self.chart.redraw();
         self.rebuildAxesControls();
     };
 
@@ -1105,6 +1349,7 @@ var detailChartRenderer = function()
         var max = clientY + heightY;
         var min = clientY - heightY;
         var seriesToMove;
+        var dataSourceOfMovingSeries;
         for(var i = 0; i < chart.chart.series.length; i++)
         {            
             var minx = chart.chart.series[i].xAxis.min;
@@ -1120,6 +1365,7 @@ var detailChartRenderer = function()
                     && y <= (max) && y >= (min))
                 {
                     seriesToMove = chart.chart.series[i];
+                    dataSourceOfMovingSeries = chart.dataSourcesToChannels[i];
                     msg = msg + '</br><strong>Data source:</strong>' + chart.dataSourcesToChannels[i] +
                      '</br><strong>Channel:</strong> ' + chart.chart.series[i].name + 
                      '</br><strong>Date:</strong> ' + Highcharts.dateFormat('%Y-%m-%d %H:%M:%S.%L', date) + 
@@ -1129,66 +1375,70 @@ var detailChartRenderer = function()
             }
         }    
         var buttons;    
+        var axesRelations = chart.getAxesRelations(dataSourceOfMovingSeries);        
         if(seriesToMove.yAxis.options.id === 'temporary')
         {
            buttons =  {"Delete this series from the temporary axis": function()
             {
                 var flag;
+                var needenAxis;
                 if(seriesToMove.yAxis.series.length === 1)
                 {
                     flag = true;                  
                 } 
-                var standartAxis = chart.chart.get('standart');                            
-                if(!standartAxis)
+                for(var i = 0; i < axesRelations.length; i++)
                 {
-                    standartAxis = {gridLineWidth: 0, id: 'standart',labels: {format: '{value}', style: { color: Highcharts.getOptions().colors[0]}}, title: {text: 'Standart axis', style: { color: Highcharts.getOptions().colors[0]}}};
-                    
-                    chart.chart.addAxis(standartAxis, false, false);
-                    chart.axesToShow.push(standartAxis); 
-                }                
+                    if(seriesToMove.options.channelNumber === axesRelations[i].channelNumber)
+                    {
+                        needenAxis = axesRelations[i].currentAxis = axesRelations[i].value;
+                        break;
+                    }
+                }                           
                 var jSONSeries = JSON.stringify(seriesToMove.options);
                 var series = JSON.parse(jSONSeries);                    
                 seriesToMove.remove();
-                series.yAxis = 'standart';
-                series.color = Highcharts.getOptions().colors[0];
-                chart.chart.addSeries(series, true);    
-                var temporaryAxis = chart.chart.get('temporary');
+                series.yAxis = needenAxis;
+                series.color = chart.chart.get(needenAxis).options.labels.style.color;
+                series.lineWidth = 1;
+                chart.chart.addSeries(series, true);                    
                 if(flag)
                 {
-                    temporaryAxis.remove();                    
-                }              
+                    var temporaryAxis = chart.chart.get('temporary');
+                    temporaryAxis.remove();
+                    chart.axesToShow.splice(chart.axesToShow.length, 1);
+                }           
+                chart.rebuildAxesControls();   
             }}                   
         }
         else
         {
             if(seriesToMove.yAxis.series.length !== 1)
             {            
-                buttons = {"Show this series on another axes": function()
-                {
-                   
-                    if(seriesToMove.yAxis.options.id === 'temporary')
+                buttons = {"Show last series on another axis": function()
+                {   
+                    for(var i = 0; i < axesRelations.length; i++)
                     {
-                        alert("Series is already on temporary axis.");
-                        return;
+                        if(seriesToMove.options.channelNumber === axesRelations[i].channelNumber)
+                        {                            
+                            axesRelations[i].currentAxis = 'temporary';
+                            break;
+                        }
                     }
-                    else
+                    var temporaryAxis = chart.chart.get('temporary');
+                    if(!temporaryAxis)
                     {
-                        var temporaryAxis = chart.chart.get('temporary');
-
-                        if(!temporaryAxis)
-                        {
-                            chart.chart.addAxis(chart.temporaryAxis, false, false);
-                            chart.axesToShow.push(chart.temporaryAxis); 
-                        }                      
-                        var jSONSeries = JSON.stringify(seriesToMove.options);
-                        var series = JSON.parse(jSONSeries);
-                        seriesToMove.remove();
-                        series.yAxis = 'temporary';
-                        series.color = chart.temporaryAxis.labels.style.color;
-                        chart.chart.addSeries(series, true);
-                    }
-                                  
-                 }};
+                        chart.chart.addAxis(chart.temporaryAxis, false, false);                        
+                    }                      
+                    var jSONSeries = JSON.stringify(seriesToMove.options);
+                    var series = JSON.parse(jSONSeries);
+                    seriesToMove.remove();
+                    series.yAxis = 'temporary';
+                    series.color = chart.temporaryAxis.labels.style.color;
+                    series.lineWidth = 1;
+                    chart.chart.addSeries(series, true);
+                    chart.rebuildAxesControls();                                   
+                }
+                };
              }
         }
         msg = msg + '</div>';
@@ -1207,6 +1457,22 @@ var detailChartRenderer = function()
         });
 
     };
+
+    me.getAxesRelations = function(dataSource)
+    {
+        var self = this;
+        dataSource = dataSource.split(' ');
+        for (var i = 0; i < self.dataSources.length; i++)
+        {
+            if (self.dataSources[i].db_server === dataSource[0] &&
+                    self.dataSources[i].db_name === dataSource[1] &&
+                    self.dataSources[i].db_group === dataSource[2])
+
+            {
+                return self.dataSources[i].axesToChannels;
+            }
+        }
+    }
 
     me.formDataSources = function(dataSource)
     {
@@ -1237,6 +1503,24 @@ var detailChartRenderer = function()
             }
         }
 
+    };
+
+    me.dispose = function()
+    {
+        var self = this;
+        if(self.chart !== null)
+        {
+            self.chart.destroy();               
+        }        
+        self.dataSourcesToChannels = [];
+        self.series = [];
+    };
+
+    me.formChartWithEmptySeries = function()
+    {
+        var self = this;
+        self.formChart(self.id, []);
+        self.chart = jQuery('#' + self.id).highcharts();
     };
 
 
@@ -1336,10 +1620,11 @@ var detailChartRenderer = function()
         {
             self.chart.yAxis[i].options.startOnTick = false;
             self.chart.yAxis[i].options.endOnTick = false;
-            self.chart.yAxis[i].setExtremes(min[i], max[i]);
+            self.chart.yAxis[i].setExtremes(min[i], max[i], false);
         }            
-        self.chart.xAxis[0].setExtremes(begTime, endTime);
+        self.chart.xAxis[0].setExtremes(begTime, endTime, false);
         self.masterChart.changePlotbands(begTime, endTime);
+        self.chart.redraw();
         self.rebuildAxesControls();
     };
 
@@ -1364,13 +1649,13 @@ var detailChartRenderer = function()
         {
             self.chart.yAxis[i].options.startOnTick = false;
             self.chart.yAxis[i].options.endOnTick = false;
-            self.chart.yAxis[i].setExtremes(min[i], max[i]);
+            self.chart.yAxis[i].setExtremes(min[i], max[i], false);
         }        
         
-        self.chart.xAxis[0].setExtremes(begTime, endTime);
+        self.chart.xAxis[0].setExtremes(begTime, endTime, false);
         self.masterChart.changePlotbands(begTime, endTime);
-        self.rebuildAxesControls();
-
+        self.chart.redraw();
+        self.rebuildAxesControls();      
     };
 
     me.changeMasterChartSeries = function(seriesId)
@@ -1385,6 +1670,7 @@ var detailChartRenderer = function()
     me.addSeries = function(series, isRedraw)
     {
         this.series.push(series);
+        series.lineWidth = 1;        
         this.chart.addSeries(series, isRedraw);
     };
 
@@ -1431,6 +1717,24 @@ var detailChartRenderer = function()
 
     };
 
+    me.isPriviousRequest = function(dataSources)
+    {
+        var self = this;
+        if(dataSources.length !== self.dataSources.length)
+        {return false;}
+        for(var i = 0; i < dataSources.length; i++)
+        {            
+            if(dataSources[i].db_server !== self.dataSources[i].db_server ||
+                  dataSources[i].db_name !== self.dataSources[i].db_name ||
+                  dataSources[i].db_group !== self.dataSources[i].db_group ||
+                  dataSources[i].channels !== self.dataSources[i].channels)
+            {
+                return false;
+            }
+        }
+        return true;
+    }
+
     me.getAllAxes = function()
     {
         var self = this;
@@ -1452,7 +1756,7 @@ var detailChartRenderer = function()
 
     me.formURLAxes = function(db_server, db_name, db_group, db_channels, target)
     {
-        var url = 'http://ipecluster5.ipe.kit.edu/ADEIRelease/adei/services/list.php?db_server=' + db_server
+        var url = this.hostURL + '/services/list.php?db_server=' + db_server
                 + '&db_name=' + db_name
                 + '&db_group=' + db_group
                 + '&db_mask=' + db_channels
@@ -1460,14 +1764,37 @@ var detailChartRenderer = function()
                 + '&info=1';
         return url;
     };
+    
+    me.httpGetText = function(url)
+    {
+	var xmlHttp = null;
+	
+	xmlHttp = new XMLHttpRequest();
+	xmlHttp.open("GET", url, false);
+	xmlHttp.send(null);
+	return xmlHttp.response;
+    };
 
-   
+   me.stringtoXML = function(text)
+   {
+        if (window.ActiveXObject)
+        {
+    	    var doc=new ActiveXObject('Microsoft.XMLDOM');
+    	    doc.async='false';
+    	    doc.loadXML(text);
+        } else 
+        {
+	    var parser=new DOMParser();
+    	    var doc=parser.parseFromString(text,'text/xml');
+	}
+	return doc;
+    };
 
     me.formNeedenAxes = function(dataSource)
     {
         var self = this;
         var url = self.formURLAxes(dataSource.db_server, dataSource.db_name, dataSource.db_group, dataSource.channels, 'items');              
-        var responseXML = self.db.httpGetXml(url);
+        var responseXML = self.stringtoXML(self.httpGetText(url));
         var items = responseXML.getElementsByTagName('Value');
         var axesArray = [];        
         for(var i = 0; i < items.length; i++)
@@ -1475,7 +1802,8 @@ var detailChartRenderer = function()
             var axisObj = {};
             axisObj.channelNumber = items[i].getAttribute('value');
             axisObj.channelName = items[i].getAttribute('name');
-            axisObj.value = items[i].getAttribute('axis');          
+            axisObj.value = items[i].getAttribute('axis'); 
+            axisObj.currentAxis = items[i].getAttribute('axis');
             axesArray.push(axisObj);
         }
         return axesArray;
@@ -1504,25 +1832,41 @@ var detailChartRenderer = function()
                 }                
             }
             if(!flag)
-            {
+            {    
                 needenIds.push(dataSource.axesToChannels[i]);                
             }
         }
 
         self.needenAxes = needenIds;
         axesToShow = [];
+        var counter = 1;
         var flag = false;
         for(var i = 0; i < self.axes.length; i++)
         {
-            var axesObj = {value: '',labels: {format: '{value} ', style: { color: Highcharts.getOptions().colors[i + 1]}}, title: {text: '', style: { color: Highcharts.getOptions().colors[i + 1]}}};
+    	    if(counter > 9)
+    	    {
+    	        counter = 1;
+    	    }
+            var axesObj = {value: '',labels: {format: '{value} ', style: { color: Highcharts.getOptions().colors[counter]}}, title: {text: '', style: { color: Highcharts.getOptions().colors[counter]}}};
+            counter++;
             for(j = 0; j < self.needenAxes.length; j++)
             {
-                if(self.needenAxes[j].value === null && flag === false)
+        	if(typeof self.needenAxes[j] === 'undefined')
                 {
-                    flag = true;
-                    axesToShow.push({gridLineWidth: 0, id: 'standart',labels: {format: '{value}', style: { color: Highcharts.getOptions().colors[0]}}, title: {text: 'Standart axis', style: { color: Highcharts.getOptions().colors[0]}}});
-                    continue;
-                }                
+            	    flag = true;
+            	    axesToShow.push({gridLineWidth: 0, id: 'standart',labels: {format: '{value}', style: { color: Highcharts.getOptions().colors[0]}}, title: {text: 'Standart axis', style: { color: Highcharts.getOptions().colors[0]}}});
+            	    continue;    	    
+        	}
+        	else
+        	{        	    
+            	    if(self.needenAxes[j].value === null && flag === false)
+            	    {
+                	flag = true;
+                	axesToShow.push({gridLineWidth: 0, id: 'standart',labels: {format: '{value}', style: { color: Highcharts.getOptions().colors[0]}}, title: {text: 'Standart axis', style: { color: Highcharts.getOptions().colors[0]}}});
+                	continue;
+            	    }
+        	}
+            	 
                 if(self.needenAxes[j].value === self.axes[i].value)
                 {
                     if(j !== 0)
@@ -1557,6 +1901,10 @@ var detailChartRenderer = function()
             }
         }
     };
+
+    me.GetNode = function(){};
+    me.attachEvent = function(){};
+    me.dispatchEvent = function(event){};
 
     me.axes = me.getAllAxes();
     me.masterChart.setUpDetailChart(me);

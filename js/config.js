@@ -535,6 +535,7 @@ CONFIG.prototype.GetProps = function(window_type) {
 	    } else if (window_type < 0) {
 		if (this.sel_from != this.sel_to) 
 		    win = this.sel_from + "-" + this.sel_to;
+		
 		else 
 		    adeiReportError("The selection is empty. Storing full window", "CONFIG");
 	    }
