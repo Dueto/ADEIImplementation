@@ -22,6 +22,12 @@ var masterChartRenderer = function()
 
     me.isZoomed = null;
     me.onlyDragging = false;
+    me.intervalVariable = null;
+
+    me.prevbegTime = null;
+    me.orevEndTime = null;
+
+    me.controlsVisibility = 'none'
 
     me.renderMasterChar = function(id, series)
     {
@@ -81,9 +87,13 @@ var masterChartRenderer = function()
                                                 var bandDiff = (bandEndTime - bandBeginTime) / self.divWidth;
                                                 if((plotDiff / bandDiff) > 200)
                                                 {
+                                                    xAxis.removePlotLine('plotline');
+                                                    self.controlsVisibility = '';
+                                                    self.leftControl.style.display = self.controlsVisibility;   
+                                                    self.rightControl.style.display = self.controlsVisibility;
                                                     xAxis.addPlotLine({
                                                         color: 'red',
-                                                        width: 10,
+                                                        width: 12,
                                                         id: 'plotline',
                                                         value: bandBeginTime
                                                     });
@@ -92,6 +102,9 @@ var masterChartRenderer = function()
                                                 else 
                                                 {
                                                     xAxis.removePlotLine('plotline');
+                                                    self.controlsVisibility = 'none';
+                                                    self.leftControl.style.display = self.controlsVisibility;   
+                                                    self.rightControl.style.display = self.controlsVisibility;
                                                     self.onlyDragging = false;
                                                 }
 
@@ -103,7 +116,7 @@ var masterChartRenderer = function()
                             },
                     title:
                             {
-                                text: null
+                                text: series.name
                             },
                     credits:
                             {
@@ -165,11 +178,56 @@ var masterChartRenderer = function()
                                             enableMouseTracking: false
                                         }
                             },
-                    series: [series]
+                    series: [series],
+                     exporting: 
+                    {
+                        buttons: 
+                        {                    
+                            menu: 
+                            {
+                                x: -70,
+                                symbol: 'circle',
+                                menuItems: [
+                                {
+                                    onclick: self.toOptimalZoom.bind(self),
+                                    text: 'To optimal view'      
+                                },
+                                {
+                                    onclick: self.toFullZoom.bind(self),
+                                    text: 'To full view',   
+                                }]
+                            }
+                        }
+                    }
                 });
         this.chart = jQuery('#' + id).highcharts();
         self.recalculateDivSizes();
         self.buildControls();
+    };
+
+    me.toOptimalZoom = function()
+    {
+        var self = this;    
+        var plotBandBefore = self.chart.xAxis[0].plotLinesAndBands[0];
+        var plotBandAfter = self.chart.xAxis[0].plotLinesAndBands[1];  
+        var beginTime = plotBandBefore.options.to;
+        var endTime = plotBandAfter.options.from;        
+        var diffrence = (endTime - beginTime) * 2;
+        var newOptZoomBeg = ((beginTime - diffrence) < self.beginTime) ? self.beginTime : beginTime - diffrence;
+        var newOptZoomEnd = ((endTime + diffrence) > self.endTime) ? self.endTime : endTime + diffrence;
+        self.chart.xAxis[0].setExtremes(newOptZoomBeg, newOptZoomEnd);
+        self.changePlotbands(beginTime, endTime);
+    };
+
+    me.toFullZoom = function()
+    {
+        var self = this;
+        var plotBandBefore = self.chart.xAxis[0].plotLinesAndBands[0];
+        var plotBandAfter = self.chart.xAxis[0].plotLinesAndBands[1];  
+        var beginTime = plotBandBefore.options.to;
+        var endTime = plotBandAfter.options.from;  
+        self.chart.xAxis[0].setExtremes(self.beginTime, self.endTime);   
+        self.changePlotbands(beginTime, endTime);       
     };
 
     me.buildControls = function(width)
@@ -180,7 +238,7 @@ var masterChartRenderer = function()
         var parent = document.getElementById('mooveDiv');  
         self.leftControl = document.createElement('div');
         self.leftControl.className = 'chronoline-left';  
-        self.leftControl.style.display = 'none';  
+        self.leftControl.style.display = self.controlsVisibility;  
 
         var leftIcon = document.createElement('div');
         leftIcon.className = 'chronoline-left-icon';
@@ -193,11 +251,13 @@ var masterChartRenderer = function()
         self.leftControl.style.top = chart.y + 20 + 'px';
         self.leftControl.style.marginTop = '40px';
         self.leftControl.style.height = '40px';
+        self.leftControl.onmousedown = self.dragLeftSide.bind(self);        
+        self.leftControl.onmouseup = self.onControlMouseUp.bind(self);
         parent.appendChild(self.leftControl);
 
         self.rightControl = document.createElement('div');
         self.rightControl.className = 'chronoline-right'; 
-        self.rightControl.style.display = 'none'; 
+        self.rightControl.style.display = self.controlsVisibility; 
 
         var rightIcon = document.createElement('div');
         rightIcon.className = 'chronoline-right-icon';                
@@ -213,8 +273,40 @@ var masterChartRenderer = function()
         self.rightControl.style.top = chart.y + 20 +'px';
         self.rightControl.style.marginTop = '40px';
         self.rightControl.style.height = '40px';
+        self.rightControl.onmousedown = self.dragRightSide.bind(self);
+        self.rightControl.onmouseup = self.onControlMouseUp.bind(self);
         parent.appendChild(self.rightControl);
             
+    };
+
+    me.dragRightSide = function()
+    {
+        var self = this; 
+        self.intervalVariable = setInterval(function()
+            {
+                var multiplier = (self.detailChart.chart.xAxis[0].max - self.detailChart.chart.xAxis[0].min) / self.detailChart.divWidth;                     
+                var btime = self.detailChart.chart.xAxis[0].min + multiplier * 40;
+                var etime = self.detailChart.chart.xAxis[0].max + multiplier * 40;
+                self.chart.xAxis[0].removePlotBand('plotline');             
+                self.changePlotbands(btime, etime);                
+                self.detailChart.zoomChart(btime / 1000, etime / 1000, false);                           
+            }, 10);
+
+    };
+
+    me.dragLeftSide = function()
+    {
+        var self = this; 
+        self.intervalVariable = setInterval(function()
+            {
+                var multiplier = (self.detailChart.chart.xAxis[0].max - self.detailChart.chart.xAxis[0].min) / self.detailChart.divWidth;                     
+                var btime = self.detailChart.chart.xAxis[0].min - multiplier * 40;
+                var etime = self.detailChart.chart.xAxis[0].max - multiplier * 40;
+                self.chart.xAxis[0].removePlotBand('plotline');             
+                self.changePlotbands(btime, etime);                
+                self.detailChart.zoomChart(btime / 1000, etime / 1000, false);           
+            }, 10);
+
     };
 
     me.setOnZoomCallback = function(zoomCallback)
@@ -419,7 +511,8 @@ var masterChartRenderer = function()
                 }                
             }
             else
-            {   self.chart.xAxis[0].removePlotBand('plotline');             
+            {   
+                self.chart.xAxis[0].removePlotBand('plotline');             
                 self.changePlotbands(btime, etime);                
                 self.detailChart.zoomChart(btime / 1000, etime / 1000, false);
             }     
@@ -480,20 +573,20 @@ var masterChartRenderer = function()
     };
 
     me.stopDrag = function(event)
-    {
-        var self = this;
+    {     
+        var self = this;           
         if (self.dragData)
-        {            
+        {   
             event.cancelBubble = true;
             event.stopPropagation();
             self.dragData = null;
             self.dragLeftBorder = false;
             self.dragRightBorder = false;
             self.previousStateX = null;
-            document.body.style.cursor = "default";
+            document.body.style.cursor = "default"; 
             var btime = self.detailChart.chart.xAxis[0].min / 1000;
             var etime = self.detailChart.chart.xAxis[0].max / 1000;            
-            self.detailChart.refreshChart(btime, etime);            
+            self.detailChart.refreshChart(btime, etime); 
             /*for(var i = 0; i < self.detailChart.chart.yAxis.length; i++)
             {
                 var yAxis = self.detailChart.chart.yAxis[i];
@@ -505,7 +598,16 @@ var masterChartRenderer = function()
                 self.detailChart.chart.yAxis[i].options.endOnTick = false;
                 yAxis.setExtremes(min - margin, max + margin);
             }*/
-        }
+        }       
+    };
+
+    me.onControlMouseUp = function()
+    {
+        var self = this;        
+        window.clearInterval(self.intervalVariable); 
+        var btime = self.detailChart.chart.xAxis[0].min / 1000;
+        var etime = self.detailChart.chart.xAxis[0].max / 1000;            
+        self.detailChart.refreshChart(btime, etime); 
     };
 
     me.bindEvents = function(event)
@@ -568,20 +670,21 @@ var masterChartRenderer = function()
             to: self.series[0].data[self.series[0].data.length - 1][0],
             color: 'rgba(0, 0, 0, 0.2)'
         });
-        var plotBeginTime = self.series[0].data[0][0];
-        var plotEndTime = self.series[0].data[self.series[0].data.length - 1][0];
+        var plotBeginTime = self.chart.xAxis[0].min;
+        var plotEndTime = self.chart.xAxis[0].max;
         var bandBeginTime = beginTime;
         var bandEndTime = endTime;
         var plotDiff = (plotEndTime - plotBeginTime) / self.divWidth;
         var bandDiff = (bandEndTime - bandBeginTime) / self.divWidth;
         if((plotDiff / bandDiff) > 200)
         {            
-            xAxis.removePlotLine('plotline');
-            self.leftControl.style.display = '';
-            self.rightControl.style.display = '';
+            xAxis.removePlotLine('plotline');  
+            self.controlsVisibility = '';
+            self.leftControl.style.display = self.controlsVisibility;   
+            self.rightControl.style.display = self.controlsVisibility;
             xAxis.addPlotLine({
                 color: 'red',
-                width: 10,
+                width: 12,
                 id: 'plotline',
                 value: bandBeginTime
             });
@@ -589,8 +692,9 @@ var masterChartRenderer = function()
         }
         else 
         {
-            self.leftControl.style.display = 'none';
-            self.rightControl.style.display = 'none';
+            self.controlsVisibility = 'none';
+            self.leftControl.style.display = self.controlsVisibility;   
+            self.rightControl.style.display = self.controlsVisibility;
             xAxis.removePlotLine('plotline');
             self.onlyDragging = false;
         }
@@ -612,20 +716,12 @@ var masterChartRenderer = function()
 
     me.rebuildControls = function(width)
     {
-        var self = this;
-        /*self.leftControl.style.left = chart.x - 20 +'px';
-        self.leftControl.style.top = chart.y + 20 + 'px';
-        self.rightControl.style.left = chart.x - 20 + chart.width + 60 + 'px';
-        self.rightControl.style.top = chart.y + 20 +'px';*/
+        var self = this;        
         jQuery('.chronoline-left-icon').remove();
         jQuery('.chronoline-right-icon').remove();
         jQuery('.chronoline-left').remove();
         jQuery('.chronoline-right').remove();
-        self.buildControls(width);
-        self.leftControl.style.display = '';
-        self.rightControl.style.display = '';
-
-
+        self.buildControls(width);       
     };
 
     me.recalculateDivSizes = function()

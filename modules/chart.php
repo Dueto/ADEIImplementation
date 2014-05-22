@@ -26,7 +26,7 @@ function chartPage() {
 
 
      <div id="mooveDiv">   	
-     	<div id="masterChart" style="height: 100px;" style: "flow: auto"> 
+     	<div id="masterChart" style="height: 150px;" style: "flow: auto"> 
      	</div>   
    	</div>
         <div id="detailChart" style: "position:absolute;"> 

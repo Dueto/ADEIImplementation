@@ -15,7 +15,7 @@ var detailChartRenderer = function()
     
     me.neddenAxes = [];
     me.axesToChannels = [];
-    me.dataSourcesToChannels = [];
+    me.dataSourcesToChannels = [];    
 
     me.stopPropagation = false;
 
@@ -93,7 +93,7 @@ var detailChartRenderer = function()
         if(dataSource.db_server === 'virtual' && dataSource.db_name === 'srctree')
         {            
             var srctree = cfg.srctree.split(',');
-            var virtualSources = self.formVirtualSources(srctree);
+            var virtualSources = self.formVirtualSources(srctree);            
             if(self.isPriviousRequest(virtualSources))
             {
                 return;
@@ -103,6 +103,11 @@ var detailChartRenderer = function()
             var max = 0;                
             for (var i = 0; i < virtualSources.length; i++) 
             { 
+                if(virtualSources[i].channels.split(',').length > 10)
+                {
+                    alert('You setted up more then 10 channels.');
+                    return;
+                }
                 self.formAxesInfo(virtualSources[i]);
                 if(experiment === '-' || experiment === '*-*')
                 { 
@@ -141,6 +146,11 @@ var detailChartRenderer = function()
             {
                 experiment = self.getExperimentInterval(dataSource);
             }  
+            if(dataSource.channels.split(',').length > 10)
+            {
+                alert('You setted up more then 10 channels.');
+                return;
+            }
             self.formAxesInfo(dataSource);
             self.dataSources.push(dataSource);
             self.renderChart(experiment);
@@ -379,24 +389,7 @@ var detailChartRenderer = function()
                     menu: {
                         x: -70,
                         symbol: 'circle',
-                        menuItems: [
-                        {
-                            onclick: self.hideLegend.bind(self),
-                            text: 'Hide legend'      
-                        },
-                        {
-                            onclick: self.showLegend.bind(self),
-                            text: 'Show legend',   
-                        },
-                        {
-                            onclick: self.changeZoomTypeToMap.bind(self),
-                            text: 'To map manipulation', 
-                        },
-                        {
-                            onclick: self.changeZoomTypeToXY.bind(self),
-                            text: 'To XY zoom type', 
-                        }]
-                                           
+                        menuItems: self.menuItems,                                            
                     },                   
                     zoomInButton: {
                         x: -80,
@@ -431,7 +424,7 @@ var detailChartRenderer = function()
         self.chart.setSize
         (
             jQuery(window).width() - sourceWidth, 
-            jQuery(window).height() - document.getElementById('header_div').offsetHeight - 100  - 50,
+            jQuery(window).height() - document.getElementById('header_div').offsetHeight - 100  - 70,
             false
         ); 
         self.divWidth = self.getDivWidth(self.id);
@@ -1277,12 +1270,12 @@ var detailChartRenderer = function()
         else{sourceWidth = document.getElementById('main_sidebar_controls').offsetWidth}
         self.chart.setSize(
             jQuery(window).width() - sourceWidth, 
-            jQuery(window).height() - document.getElementById('header_div').offsetHeight - 100  - 50,
+            jQuery(window).height() - document.getElementById('header_div').offsetHeight - 100  - 70,
             true
         ); 
         self.masterChart.chart.setSize(
             jQuery(window).width() - sourceWidth,
-            100
+            150
         );
         self.masterChart.rebuildControls(jQuery(window).width() - sourceWidth);
     };
@@ -1902,9 +1895,32 @@ var detailChartRenderer = function()
         }
     };
 
+    me.addButtonInControls = function(text, callback)
+    {
+        var self = this;
+        self.menuItems.push({onclick:callback, text: text});
+    };
+
     me.GetNode = function(){};
     me.attachEvent = function(){};
     me.dispatchEvent = function(event){};
+
+    me.menuItems = [{
+                        onclick: me.hideLegend.bind(me),
+                        text: 'Hide legend'      
+                    },
+                    {
+                        onclick: me.showLegend.bind(me),
+                        text: 'Show legend'   
+                    },
+                    {
+                        onclick: me.changeZoomTypeToMap.bind(me),
+                        text: 'To map manipulation' 
+                    },
+                    {
+                        onclick: me.changeZoomTypeToXY.bind(me),
+                        text: 'To XY zoom type'
+                    }];
 
     me.axes = me.getAllAxes();
     me.masterChart.setUpDetailChart(me);
