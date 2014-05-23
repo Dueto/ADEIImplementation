@@ -24,13 +24,14 @@ function chartPage() {
     <div class="chronoline-right-icon" style="margin-top: 12.5px;"></div>
   </div>/!-->
 
-
+<div id="moduleChart">
      <div id="mooveDiv">   	
      	<div id="masterChart" style="height: 150px;" style: "flow: auto"> 
      	</div>   
    	</div>
         <div id="detailChart" style: "position:absolute;"> 
-         </div>    
+         </div>   
+         <div> 
 
 
 
