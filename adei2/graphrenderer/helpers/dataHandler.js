@@ -11,6 +11,7 @@ var dataHandler = function(communicationType)
     me.window = '';
     me.aggregation = '';
     me.communicationType = communicationType;
+    me.isHistoryMoving = false;
 
     me.lineSeparator = '\r\n';
     me.separator = ',';
@@ -42,7 +43,7 @@ var dataHandler = function(communicationType)
             {
                 aggregation = 'v';
             }        
-            var worker = new Worker('/ADEIRelease/adei/adei2/graphrenderer/datacaching/backgrDataCacher.js');  
+            var worker = new Worker('adei2/graphrenderer/datacaching/backgrDataCacher.js');  
             this.backCachers.push(worker);           
             worker.postMessage(this.db_server + '<>'
                     + this.db_name + '<>'
@@ -152,27 +153,20 @@ var dataHandler = function(communicationType)
     };
 
     me.concatRowData = function(res, dataBuffer, dateTime)
-    {
-        var properties = Object.keys(res.rows.item(0))
-        for (var j = 0; j < properties.length - 1; j++)
+    {   
+        for (var j = 0; j < this.db_mask.length; j++)
         {
             dataBuffer.push([]);
         }
         for (var k = 0; k < res.rows.length; k++)
-        {
-
-            for (var i = 0; i < properties.length; i++)
+        {        
+            var row = res.rows.item(k);
+            dateTime.push(row.DateTime);
+            var points = JSON.parse(row.PointsData); 
+            for(var i = 0; i < points.length; i++)
             {
-                if (properties[i] == 'DateTime')
-                {
-                    dateTime.push(res.rows.item(k).DateTime);
-                }
-                else
-                {
-                    var data = res.rows.item(k)[properties[i]];
-                    dataBuffer[i - 1].push(data);
-                }
-            }
+                dataBuffer[i].push(points[i]);
+            }   
         }
     };
 

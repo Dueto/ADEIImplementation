@@ -143,40 +143,38 @@ require("module.php");
     <script type="text/javascript" src="includes/scriptaculous/scriptaculous.js?load=builder,effects,dragdrop"></script>
     <script type="text/javascript" src="includes/cropper/cropper.js"></script>
 
- <!-- HIGHCHARTS RENDERER /!-->
-  <!-- HIGHCHARTS RENDERER /!-->
-   <!-- HIGHCHARTS RENDERER /!-->
+ 	<!-- HIGHCHARTS RENDERER /!-->
+  	<!-- HIGHCHARTS RENDERER /!-->
+   	<!-- HIGHCHARTS RENDERER /!-->
     <!-- HIGHCHARTS RENDERER /!-->
 
 
-            <script src="./adei2/graphrenderer/librarys/dataStream.js"></script> 
+        <script src="./adei2/graphrenderer/librarys/dataStream.js"></script> 
         <script src="./adei2/graphrenderer/datacaching/webSockets.js"></script>   
-      <script src="./adei2/graphrenderer/helpers/dataHandler.js"></script>
-     <script src="./adei2/graphrenderer/helpers/dateTimeFormat.js"></script>  
- 	<link rel="stylesheet" type="text/css" href="./adei2/graphrenderer/css/jquery-ui-1.10.4.custom.css">
-          <script src="./adei2/graphrenderer/datacaching/dataCacher.js"></script>
-             <!--  <script src="./adei2/graphrenderer/datacaching/backgrDataCacher.js"></script>
-       
-    <!--   <script type="text/javascript" src="http://ajax.googleapis.com/ajax/libs/jquery/1.8.2/jquery.min.js"></script>  /!-->
-        
-         <script src="./adei2/graphrenderer/librarys/jquery-1.10.2.js"></script>
-         <script src="./adei2/graphrenderer/librarys/jquery-ui-1.10.4.custom.js"></script>  
-
-
-
-  <!--     <script src="./adei2/graphrenderer/librarys/highstock.js"></script>   
+        <script src="./adei2/graphrenderer/helpers/dataHandler.js"></script>
+        <script src="./adei2/graphrenderer/helpers/historyHandler.js"></script>
+        <script src="./adei2/graphrenderer/helpers/dateTimeFormat.js"></script>  
+ 	    <link rel="stylesheet" type="text/css" href="./adei2/graphrenderer/css/jquery-ui-1.10.4.custom.css">
+        <script src="./adei2/graphrenderer/datacaching/dataCacher.js"></script>
+        <!--  <script src="./adei2/graphrenderer/datacaching/backgrDataCacher.js"></script>       
+    	<!--   <script type="text/javascript" src="http://ajax.googleapis.com/ajax/libs/jquery/1.8.2/jquery.min.js"></script>  /!-->        
+        <script src="./adei2/graphrenderer/librarys/jquery-1.10.2.js"></script>
+        <script src="./adei2/graphrenderer/librarys/jquery-ui-1.10.4.custom.js"></script>  
+  		<!--     <script src="./adei2/graphrenderer/librarys/highstock.js"></script>   
          <script src="./adei2/graphrenderer/modules/data.js"></script>
          <script src="./adei2/graphrenderer/modules/exporting.js"></script>/!-->
+		<!-- <script src="./adei2/graphrenderer/librarys/highstock.js"></script>/!-->	
+		<script src="http://code.highcharts.com/highcharts.js"></script>
 
-<!-- <script src="./adei2/graphrenderer/librarys/highstock.js"></script>/!-->
-<script src="http://code.highcharts.com/highcharts.js"></script>
-<script src="http://code.highcharts.com/modules/exporting.js"></script>
-   <script src="./adei2/graphrenderer/rendering/masterChartRenderer.js"></script>
-       <script src="./adei2/graphrenderer/rendering/detailChartRenderer.js"></script>
+		<script src="http://code.highcharts.com/modules/exporting.js"></script>
+
+   		<script src="./adei2/graphrenderer/rendering/masterChartRenderer.js"></script>
+        <script src="./adei2/graphrenderer/rendering/detailChartRenderer.js"></script>
      
- <!-- HIGHCHARTS RENDERER /!-->
-  <!-- HIGHCHARTS RENDERER /!-->
-   <!-- HIGHCHARTS RENDERER /!-->
+	<!-- HIGHCHARTS RENDERER /!-->
+  	<!-- HIGHCHARTS RENDERER /!-->
+   	<!-- HIGHCHARTS RENDERER /!-->
+   	<!-- HIGHCHARTS RENDERER /!-->
 
 	
 <?/*
@@ -242,6 +240,8 @@ require("module.php");
 ?>    
     <script type="text/javascript" ev:event="onload">
 //<![CDATA[
+
+
 	function Geometry() {
 	    /* DS: Do we need this? */
 	    if (typeof adei == "undefined") return;

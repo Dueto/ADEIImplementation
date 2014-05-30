@@ -10,7 +10,8 @@ var dataCacher = function(communicationType, isCache, isCacheDown, isCacheUp, is
     me.isCacheUp = isCacheUp;
     me.isCacheCurrent = isCacheCurrent;
 
-    me.HostURL = 'http://ipecluster5.ipe.kit.edu/ADEIRelease/adei';
+    //me.hostURL = 'http://ipecluster5.ipe.kit.edu/ADEIRelease/adei';
+    me.HostURL = '././.'
 
     me.db = '';
     me.clientsCallback = '';
@@ -44,7 +45,7 @@ var dataCacher = function(communicationType, isCache, isCacheDown, isCacheUp, is
         self.dataHandl.deleteWorkers();
         self.clientsCallback = onEndCallBack;
         self.aggregation = aggregation;
-        if (self.dataHandl.isPriviousRequest())
+        if (self.dataHandl.isPriviousRequest(db_server, db_name, db_group, aggregation, db_items))
         {
             if (db_mask != 'all')
             {
@@ -365,7 +366,13 @@ var dataCacher = function(communicationType, isCache, isCacheDown, isCacheUp, is
             }
             catch(ex)
             {
-
+                console.log(ex);
+                this.isFirefox = true;
+                this.isCache = false;
+                this.isCacheDown = false;
+                this.isCacheUp = false;
+                this.isCacheCurrent = false;
+                alert('Not ehough space  in browser cache, please clear it, to improve performance.');
             }
             
         }
@@ -515,11 +522,11 @@ var dataCacher = function(communicationType, isCache, isCacheDown, isCacheUp, is
     {
         var self = this;
         var db_mask = self.dataHandl.getDbMask();
-        var columns = '';
-        for (var i = 0; i < db_mask.length; i++)
+        var columns = ', PointsData';
+        /*for (var i = 0; i < db_mask.length; i++)
         {
             columns = columns + ', column' + db_mask[i];
-        }
+        }*/
         return columns;
     };
 
@@ -616,7 +623,10 @@ var dataCacher = function(communicationType, isCache, isCacheDown, isCacheUp, is
     };
 
     me.openDataBase('DB');
-    me.formDataBase();
+    if(me.db !== '')
+    {
+        me.formDataBase();
+    }    
 
     if (me.communicationType === 'websockets')
     {

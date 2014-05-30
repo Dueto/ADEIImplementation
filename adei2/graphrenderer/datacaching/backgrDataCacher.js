@@ -3,6 +3,7 @@ importScripts('../librarys/dataStream.js');
 importScripts('./webSockets.js');
 
 hostURL = 'http://ipecluster5.ipe.kit.edu/ADEIRelease/adei';
+//hostURL = './././.'
 
 self.addEventListener('message', function(e)
 {
@@ -29,7 +30,7 @@ socket = webSockets('ws://ipecluster5.ipe.kit.edu:12345');
 
 startBackgroundCaching = function()
 {
-    channelCount = tableColumns.split(',').length - 1;
+    channelCount = db_items.split(',').length;
     switch (communicationType)
     {
         case 'websockets':
@@ -405,11 +406,13 @@ function request(needenTime)
 function formValues(data, i)
 {
     var values = '';
+    var points = [];
     for (var j = 0; j < data.length; j++)
     {
-        values = values + ',' + data[j][i];
+        //values = values + ',' + data[j][i];
+        points.push(data[j][i]);
     }
-    return values;
+    return ', "' + JSON.stringify(points) + '"';
 }
 ;
 

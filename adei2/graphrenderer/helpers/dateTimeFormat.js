@@ -55,7 +55,7 @@ var dateTimeFormat = function()
         if (endTime.indexOf('.') - 1)
         {
             endTime = endTime.split('.')[0];
-        }
+        }        
         return {begTime: beginTime, endTime: endTime};
     };
 
