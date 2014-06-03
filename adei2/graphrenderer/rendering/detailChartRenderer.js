@@ -1,81 +1,99 @@
-var detailChartRenderer = function()
+var detailChartRenderer = function(containerId)
 {
+    "use strict";
+
     var me = {};
+    me.className = 'detailChartRenderer';
+    me.hostURL = '././.';
 
+    me.masterChart    = new masterChartRenderer();
+    me.historyHandler = new historyHandler();    
+    me.db             = new dataCacher('httpgetbinary', true, true, false, false);
 
-    me.masterChart = new masterChartRenderer();
-    me.historyHandler = new historyHandler();
-    me.db = new dataCacher('httpgetbinary', true, true, false, false);
-
+    me.containerId = containerId;
     me.masterChartId = 'masterChart';
     me.id = 'detailChart';
+    me.masterChartSeriesNumber = 0;    
     me.chart = null;
+    me.rect = null;
+
     me.upControl = null;
     me.downControl = null;
     me.leftControl = null;
     me.rightControl = null;
-    me.intervalVariable = null;
-
+    me.moovingRightCount = 0;
+    me.moovingLeftCount = 0;
     me.isHistoryMoving = false;
 
-    me.masterChartSeriesNumber = 0;
+    me.intervalVariable = null;    
+    me.callbacksOnRefreshing = [];  
 
-    me.hostURL = 'http://ipecluster5.ipe.kit.edu/ADEIRelease/adei';
-    me.hostURL = '././.'
-
-    me.axes = '';
-    me.axesToShow = [];
-    
-    me.neddenAxes = [];
-    me.axesToChannels = [];
-    me.dataSourcesToChannels = []; 
-
-    me.moovingRightCount = 0;
-    me.moovingLeftCount = 0;   
-
+    me.axes = null;
+    me.axesToShow = [];  
+    me.axesToChannels = [];  
+    me.neddenAxes = [];    
+     
+    me.selectedXExtremes = null;
+    me.selectedYExtremes = []; 
+    me.resetXAxisAfterRenderTime = false;
+    me.resetYAxisAfterRenderTime = false;
+    me.setUpNeedenExtremes = false;   
+      
     me.stopPropagation = false;
 
-    me.temporaryAxis = {gridLineWidth: 0, id: 'temporary',labels: {format: '{value}', style: { color: 'black'}}, title: {text: 'Temporary axis', style: { color: 'black'}}};
-
-    me.series = '';
-    me.divWidth = '';
-    me.divHieght = '';
-    me.pointCount = '';
-    me.timer = '';
+    me.series = null;
+    me.divWidth = null;
+    me.divHieght = null;
+    me.pointCount = 800;
+    me.timer = null;
     me.delta = 0;
     me.resolutionMultiplier = 0.4;
-    me.zoomMultiplier = 20;    
+    me.zoomMultiplier = 50;    
     me.mouseDown = 0;
-    me.initialBeginTime = '';
-    me.initialEndTime = '';    
+    me.initialBeginTime = null;
+    me.initialEndTime = null;    
     me.dragData = null;
     me.zoomType = 'xy';
-    me.chartOptions = '';
+    me.chartOptions = null;
     me.isLegendEnabled = false;
     me.firstRequest = false;
     me.needenWindow = '-';
-
-    me.resetXAxisAfterRenderTime = false;
-    me.resetYAxisAfterRenderTime = false;
-    me.setNeedenExtremesAfterRenderTime = false;
-    me.needenExtremes = null;
+    
     me.previousStateX = null;
     me.previousStateY = null;
     
     me.dataSources = [];
     me.currentDataSource = 0;
-    me.allChannels = '';
+    me.allChannels = null;
     me.dataSourcePeriod = 0;
-    me.dataSourceLevel = '';
+    me.dataSourceLevel = null;
+    me.dataSourcesToChannels = []; 
 
-
-
-    me.className = 'detailChartRenderer';
+    me.temporaryAxis = 
+    {
+        gridLineWidth: 0, 
+        id: 'temporary',
+        labels: 
+        {
+            format: '{value}', 
+            style: 
+            { 
+                color: 'black'
+            }
+        }, 
+        title: 
+        {
+            text: 'Temporary axis', 
+            style: 
+            { 
+                color: 'black'
+            }
+        }
+    };
 
     me.Request = function(cfg)
     {
-        var self = this;        
-        //self.dataSources = [];
+        var self = this;  
         var dataSource = {};
         dataSource.db_server = cfg.db_server;
         dataSource.db_name = cfg.db_name;
@@ -87,18 +105,17 @@ var detailChartRenderer = function()
         {
             dataSource.aggregation = 'mean';
         }       
-        if(parseInt(cfg.window) !== 0)
+        if(parseInt(cfg.window, 10) !== 0)
         {
             self.needenWindow = (cfg.window);  
-        } 
+        }    
         self.pointCount = self.divWidth * self.resolutionMultiplier;
-        self.onDraggingRigth = self.divWidth - self.onDraggingLeft;        
         self.masterChart.setOnZoomCallback(self.onZoomMasterChartEvent.bind(self));         
         if(self.chart !== null && self.masterChart !== null && self.masterChart.chart !== null)
         {
             self.resizeCharts();
             self.divWidth = self.getDivWidth(self.id);
-            self.divHieght = self.getDivHieght(self.id);
+            self.divHieght = self.getDivHieght(self.id);            
             self.masterChart.recalculateDivSizes();
         } 
         if(dataSource.db_server === 'virtual' && dataSource.db_name === 'srctree')
@@ -125,11 +142,11 @@ var detailChartRenderer = function()
                     var time = self.getExperimentInterval(virtualSources[i]);                           
                     var beginTime = time.split('-')[0];
                     var endTime = time.split('-')[1];
-                    if(parseInt(min) > parseInt(endTime))
+                    if(parseInt(min, 10) > parseInt(endTime, 10))
                     {
                         min = endTime;
                     }
-                    if(parseInt(max) < parseInt(beginTime))
+                    if(parseInt(max, 10) < parseInt(beginTime, 10))
                     {
                         max = beginTime;
                     }  
@@ -140,8 +157,8 @@ var detailChartRenderer = function()
                     max = experiment.split('-')[0];
                 }
             }
-            self.initialBeginTime = min;
-            self.initialEndTime = max;
+            self.initialBeginTime = max;
+            self.initialEndTime = min;
             self.dataSources = virtualSources;
             if(!self.stopPropagation)
             {
@@ -171,8 +188,7 @@ var detailChartRenderer = function()
             self.addStateInHistory(self.initialBeginTime, self.initialEndTime);
             self.formAxesInfo(dataSource);
             self.dataSources.push(dataSource);
-            self.renderChart(experiment);
-            //self.setChartTitle();
+            self.renderChart(experiment);      
         }   
     };
 
@@ -180,13 +196,13 @@ var detailChartRenderer = function()
     {
         var self = this;       
         self.divWidth = self.getDivWidth(self.id);
-        self.divHieght = self.getDivHieght(self.id);
-        self.pointCount = self.divWidth * self.resolutionMultiplier;
+        self.divHieght = self.getDivHieght(self.id);        
         self.onDraggingRigth = self.divWidth - self.onDraggingLeft;        
 
         self.series = [];
         self.dataSourcesToChannels = [];
         self.formChart(self.id, self.series);
+        self.pointCount = self.chart.chartWidth * self.resolutionMultiplier;
         self.chart = jQuery('#' + self.id).highcharts();
         self.masterChart.setOnZoomCallback(self.onZoomMasterChartEvent.bind(self));
         try
@@ -198,8 +214,7 @@ var detailChartRenderer = function()
                 {
                     self.dataSourceLevel = self.db.level.window;
                     if (obj === null)
-                    {
-                        //alert('No data in server responces.');
+                    {             
                         console.log('No data in server responces');
                     }
                     else
@@ -212,7 +227,6 @@ var detailChartRenderer = function()
                             self.dataSourcesToChannels.push(self.dataSources[0].db_server  + ' '
                             + self.dataSources[0].db_name  + ' ' 
                             + self.dataSources[0].db_group);
-
                         }
                         var masterSeries = {};
                         masterSeries.data = self.series[0].data;
@@ -226,8 +240,8 @@ var detailChartRenderer = function()
                             var min = self.chart.xAxis[0].min;
                             if(typeof self.needenWindow.split('-')[1] !== 'undefined')
                             {
-                                var minWindow = parseInt(self.needenWindow.split('-')[0]) * 1000;
-                                var maxWindow = parseInt(self.needenWindow.split('-')[1]) * 1000;
+                                var minWindow = parseInt(self.needenWindow.split('-')[0], 10) * 1000;
+                                var maxWindow = parseInt(self.needenWindow.split('-')[1], 10) * 1000;
                                 if(minWindow >= min && maxWindow <= max && minWindow < maxWindow)
                                 {
                                     min = minWindow;
@@ -237,9 +251,9 @@ var detailChartRenderer = function()
                             else
                             {
                                 var diffrence = max - min;                    
-                                if(diffrence > (parseInt(self.needenWindow) * 1000))
+                                if(diffrence > (parseInt(self.needenWindow, 10) * 1000))
                                 {
-                                    min = max - parseInt(self.needenWindow) * 1000;
+                                    min = max - parseInt(self.needenWindow, 10) * 1000;
                                 }
                             }                
                             self.chart.xAxis[0].setExtremes(min, max);
@@ -279,7 +293,7 @@ var detailChartRenderer = function()
         self.chartOptions = {
             chart:
                     {                        
-                        zoomType: self.zoomType,
+                        zoomType: '',
                         height: 800,
                         events:
                                 {
@@ -336,8 +350,7 @@ var detailChartRenderer = function()
                         y: 20,
                         x: -100,
                         symbolHeight: 20,
-                        floating: false,
-                        //margin: 100,
+                        floating: false                        
                     },
             plotOptions:
                     {
@@ -345,7 +358,7 @@ var detailChartRenderer = function()
                                 {
                                     dataLabels:
                                             {
-                                                enabled: false,
+                                                enabled: false
                                             }
                                 },
                         series:
@@ -380,14 +393,11 @@ var detailChartRenderer = function()
                                                 hover:
                                                         {
                                                     	    enabled: true,
-                                                    	    lineWidth: 1
-                                                            
+                                                    	    lineWidth: 1                                                            
                                                         }
                                             },
-                                    threshold: null,
+                                    threshold: null
                                 }
-
-
                     },
             tooltip:
                     {
@@ -424,42 +434,46 @@ var detailChartRenderer = function()
                     zoomInButton: {
                         x: -50,
                         y: 140,
+                        _titleKey: 'Zoom in',
                         onclick: self.zoomIn.bind(self),
                         text: '+',  
                         theme: 
                         {
                             zIndex: 20
-                        },                           
+                        }                           
                     },
                     zoomOutButton: {
                         x: -35,
                         y: 140,
+                        _titleKey: 'Zoom out',
                         onclick: self.zoomOut.bind(self),
                         text: '-',   
                         theme: 
                         {
                             zIndex: 20
-                        },  
+                        }
                     },
                     prevStateButton: {
                         x: -55,
                         y: 80,
+                        _titleKey: 'To previous state',
                         onclick: self.renderPreviousState.bind(self),
                         text: '<-',   
                         theme: 
                         {
                             zIndex: 20
-                        },  
+                        } 
                     },
                     nextStateButton: {
                         x: -25,
                         y: 80,
+                        _titleKey: 'To next state',
                         onclick: self.renderNextState.bind(self),
                         text: '->',   
                         theme: 
                         {
                             zIndex: 20
-                        },  
+                        } 
                     }
                     
                 }
@@ -487,73 +501,26 @@ var detailChartRenderer = function()
         self.buildControls();
         self.bindEvents();
         self.masterChart.bindEvents();
-        //self.addButton('->', 190, 12, self.renderNextState.bind(self));
-        //self.addButton('<-', 160, 12, self.renderPreviousState.bind(self));
-
-        //makeScalabale(Highcharts);
-        /* (function(H)
-         {
-         H.wrap(H.Tooltip.prototype, 'refresh', function(proceed, point, e)
-         {
-         if (e.type !== 'mousemove' )
-         {
-         proceed.call(this, point, e);
-         }
-
-         });
-         H.addEvent(H.Point.prototype, 'click', function(e)
-         {
-         e.point.series.chart.tooltip.refresh(e.point, e);
-         });
-         }(Highcharts));*/
     };
 
-    me.onZoomEvent = function(event)
+    me.onZoomEvent = function()
     {
-        var self = this;
-        if (event.xAxis)
+        var self = this;  
+        var begTime = self.selectedXExtremes.beginTime;
+        var endTime = self.selectedXExtremes.endTime;
+        self.removeSelection();
+        self.setUpNeedenExtremes = true;       
+        self.masterChart.changePlotbands(begTime, endTime);
+        if(!self.stopPropagation)
         {
-            var begTime = event.xAxis[0].min / 1000;
-            var endTime = event.xAxis[0].max / 1000;
-            var prevBegTime = event.xAxis[0].axis.min / 1000;
-            var prevEndTime = event.xAxis[0].axis.max / 1000;
-            var max = event.yAxis[0].max;
-            var min = event.yAxis[0].min;
-            var prevMin = event.yAxis[0].axis.min;
-            var prevMax = event.yAxis[0].axis.max;
-            var diffY = (max - min) / self.divHieght;
-            var diffX = (endTime - begTime) / self.divWidth;
-            var prevDiffY = (prevMax - prevMin) / self.divHieght;
-            var prevDiffX = (prevEndTime - prevBegTime) / self.divWidth;
-            if(diffY <= prevDiffY / 30)
-            {
-                self.resetXAxisAfterRenderTime = false;
-                self.resetYAxisAfterRenderTime = true;
-            }
-            if(diffX <= prevDiffX / 30)
-            {
-                self.resetXAxisAfterRenderTime = true;
-                self.resetYAxisAfterRenderTime = false;
-                begTime = prevBegTime;
-                endTime = prevEndTime;             
-            }
-            self.masterChart.changePlotbands(begTime * 1000, endTime * 1000);
-            if(!self.stopPropagation)
-            {
-                self.refreshChart(begTime, endTime);
-            }
-        }
-        else
-        {
-            self.resetYAxis();
-        }
+            self.refreshChart(begTime / 1000, endTime / 1000);
+        }  
 
     };
 
     me.onZoomMasterChartEvent = function(event)
     {
         var self = this;
-        //self.hideLegend();
         var begTime = event.xAxis[0].min / 1000;
         var endTime = event.xAxis[0].max / 1000;
         begTime = (begTime.toString()).split('.')[0];
@@ -563,7 +530,6 @@ var detailChartRenderer = function()
             self.refreshChartFromMasterChart(begTime, endTime); 
         }        
     };
-
 
 
     me.refreshZoomSeries = function(beginTime, endTime)
@@ -584,8 +550,7 @@ var detailChartRenderer = function()
                     self.currentDataSource++;
                     self.series.push([]);
                     self.refreshChart(beginTime, endTime);
-                    console.log('No data in server responces.');
-                    //alert('No data in server responces.');
+                    console.log('No data in server responces.');                
                     return;                   
                 }
                 else
@@ -615,6 +580,7 @@ var detailChartRenderer = function()
         var self = this;        
         if (self.currentDataSource === 0)
         {              
+            self.db.dataHandl.deleteWorkers();
             self.stopPropagation = true;   
             self.series = [];       
             self.refreshZoomSeries(beginTime, endTime);
@@ -624,29 +590,23 @@ var detailChartRenderer = function()
             self.refreshZoomSeries(beginTime, endTime);
         }
         else
-        {                      
-            
-            self.setUpNewSeries();
-            var xAxis = self.chart.xAxis[0];
-            xAxis.setExtremes(beginTime * 1000, endTime * 1000, false);
-            //self.chart.redraw(); 
-            self.currentDataSource = 0;
-            self.chart.redraw();
-            self.rebuildAxesControls();
-            self.stopPropagation = false;            
+        {                     
+            self.setUpNewSeries();            
+            self.chart.xAxis[0].setExtremes(beginTime * 1000, endTime * 1000, false);            
+            self.rebuildAxesControls();                       
             self.setChartTitle();
-            self.addStateInHistory(beginTime, endTime);
+            self.removeSelection();
+            self.addStateInHistory(beginTime, endTime);  
+            if(self.setUpNeedenExtremes)   
+            {
+                self.setSelectedExtremes();
+                self.setUpNeedenExtremes = false;
+            }
+            self.chart.redraw();
+            self.callCallbacks();
+            self.stopPropagation = false; 
             self.isHistoryMoving = false;
-            if(self.resetYAxisAfterRenderTime)
-            {
-                self.resetYAxis();
-                self.resetYAxisAfterRenderTime = false;
-            }         
-            else if(self.setNeedenExtremesAfterRenderTime)
-            {
-                self.setNeedenExtremes();
-                self.setNeedenExtremesAfterRenderTime = false;
-            }  
+            self.currentDataSource = 0;
         }         
     };
 
@@ -658,6 +618,15 @@ var detailChartRenderer = function()
         {
             self.masterChart.setTitle(title); 
         }        
+    };
+
+    me.callCallbacks = function(beginTime, endTime) // :DDD
+    {
+        var self = this;
+        for(var i = 0; i < self.callbacksOnRefreshing.length; i++)
+        {
+            self.callbacksOnRefreshing[i](beginTime, endTime);
+        }
     };
 
     me.setUpNewSeries = function()
@@ -697,12 +666,10 @@ var detailChartRenderer = function()
                 if (obj === null)
                 {
                     self.currentDataSource++;
-                    self.refreshChartFromMasterChart(beginTime, endTime);
-                    //self.addSeries({data: [], name: '', pointInterval: self.dataSourceLevel * 1000}, false);                   
+                    self.refreshChartFromMasterChart(beginTime, endTime);                                     
                     self.dataSourcesToChannels.push(self.dataSources[self.currentDataSource].db_server  + ' '
                         + self.dataSources[self.currentDataSource].db_name  + ' ' 
-                        + self.dataSources[self.currentDataSource].db_group);
-                    //alert('No data in server responces.');
+                        + self.dataSources[self.currentDataSource].db_group);            
                     console.log('No data in server responces');
                     return;
                 }
@@ -726,8 +693,7 @@ var detailChartRenderer = function()
         catch (ex)
         {     
             self.currentDataSource++;
-            self.refreshChartFromMasterChart(beginTime, endTime);
-            //self.addSeries({data: [], name: '', pointInterval: self.dataSourceLevel * 1000}, false);
+            self.refreshChartFromMasterChart(beginTime, endTime);           
             self.dataSourcesToChannels.push(self.dataSources[self.currentDataSource].db_server  + ' '
                 + self.dataSources[self.currentDataSource].db_name  + ' ' 
                 + self.dataSources[self.currentDataSource].db_group);         
@@ -743,11 +709,9 @@ var detailChartRenderer = function()
             var prevWindow = self.historyHandler.getPrevWindow();
             if(prevWindow !== null)
             {   
-                self.isHistoryMoving = true;
-                self.setNeedenExtremesAfterRenderTime = false;
+                self.isHistoryMoving = true;                
                 self.resetYAxisAfterRenderTime = true;
-                self.resetXAxisAfterRenderTime = false;
-                self.needenExtremes = prevWindow.axesExtremes;
+                self.resetXAxisAfterRenderTime = false;              
                 self.refreshChart(prevWindow.beginTime, prevWindow.endTime);
                 self.masterChart.changePlotbands(prevWindow.beginTime * 1000, prevWindow.endTime * 1000);                 
             }            
@@ -762,34 +726,33 @@ var detailChartRenderer = function()
             var nextWindow = self.historyHandler.getNextWindow();
             if(nextWindow !== null)
             {
-                self.isHistoryMoving = true;
-                self.setNeedenExtremesAfterRenderTime = false;
+                self.isHistoryMoving = true;               
                 self.resetYAxisAfterRenderTime = true;
-                self.resetXAxisAfterRenderTime = false;
-                self.needenExtremes = nextWindow.axesExtremes;
+                self.resetXAxisAfterRenderTime = false;                
                 self.refreshChart(nextWindow.beginTime, nextWindow.endTime);
                 self.masterChart.changePlotbands(nextWindow.beginTime * 1000, nextWindow.endTime * 1000);
             }            
         }
     };
 
-    me.setNeedenExtremes = function()
+    me.setSelectedExtremes = function()
     {
         var self = this;
         for(var i = 0; i < self.chart.yAxis.length; i++)
         {
             var yAxis = self.chart.yAxis[i];
-            yAxis.setExtremes(self.needenExtremes[i].min, self.needenExtremes[i].max);
-        }
+            yAxis.setExtremes(self.selectedYExtremes[i].min, self.selectedYExtremes[i].max, false);
+        }    
     };
 
     me.refreshChartFromMasterChart = function(beginTime, endTime)
     {
         var self = this;   
-        beginTime = parseInt(beginTime);
-        endTime = parseInt(endTime);    
+        beginTime = parseInt(beginTime, 10);
+        endTime = parseInt(endTime, 10);    
         if (self.currentDataSource === 0)
         {      
+            self.db.dataHandl.deleteWorkers();
             self.addStateInHistory(beginTime, endTime);
             self.stopPropagation = true;
             self.dispose();       
@@ -802,7 +765,9 @@ var detailChartRenderer = function()
         }
         else
         {   
+            self.removeSelection();
             self.afterGettingData();
+            self.callCallbacks(beginTime, endTime);
             self.currentDataSource = 0;
             self.stopPropagation = false;
             self.setChartTitle();
@@ -830,8 +795,8 @@ var detailChartRenderer = function()
         var min = self.chart.xAxis[0].min;              
         if(typeof self.needenWindow.split('-')[1] !== 'undefined')
         {
-            var minWindow = parseInt(self.needenWindow.split('-')[0]) * 1000;
-            var maxWindow = parseInt(self.needenWindow.split('-')[1]) * 1000;
+            var minWindow = parseInt(self.needenWindow.split('-')[0], 10) * 1000;
+            var maxWindow = parseInt(self.needenWindow.split('-')[1], 10) * 1000;
             if(minWindow >= min && maxWindow <= max && minWindow < maxWindow)
             {
                 min = minWindow;
@@ -841,12 +806,11 @@ var detailChartRenderer = function()
         else
         {
             var diffrence = max - min;                    
-            if(diffrence > (parseInt(self.needenWindow) * 1000))
+            if(diffrence > (parseInt(self.needenWindow, 10) * 1000))
             {
-                min = max - parseInt(self.needenWindow) * 1000;
+                min = max - parseInt(self.needenWindow, 10) * 1000;
             }
         }  
-
         self.chart.xAxis[0].setExtremes(min, max);    
     };
 
@@ -873,7 +837,6 @@ var detailChartRenderer = function()
         var series = {yAxis: 0, data: [], name: '', pointInterval: self.dataSourceLevel * 1000};
         series.data = (obj.data[i]);
         series.name = obj.label[i];
-
         var name = obj.label[i];
         for(var k = 0; k < self.dataSources[self.currentDataSource].axesToChannels.length; k++)
         {
@@ -890,8 +853,7 @@ var detailChartRenderer = function()
                 }                          
                 break;
             }                      
-        }        
-	
+        } 
     	if(series.yAxis !== 0)
     	{
     	    series.color = self.chart.get(series.yAxis).options.labels.style.color;    
@@ -917,6 +879,9 @@ var detailChartRenderer = function()
         var self = this;       
         var xAxis = self.chart.xAxis[0];
         var yAxis = self.chart.yAxis[0];
+        beginTime = self.initialBeginTime <= beginTime ? beginTime : self.initialBeginTime;
+        endTime = self.initialEndTime >= endTime ? endTime : self.initialEndTime;
+        
         xAxis.setExtremes(beginTime * 1000, endTime * 1000);
         self.masterChart.changePlotbands(beginTime * 1000, endTime * 1000);
 
@@ -941,7 +906,7 @@ var detailChartRenderer = function()
         self.delta = self.delta + Math.max(-1, Math.min(1, (e.wheelDelta || -e.detail)));
         var btime = self.chart.xAxis[0].min / 1000;
         var etime = self.chart.xAxis[0].max / 1000;
-        var diffrence = (etime - btime) / self.divWidth * self.zoomMultiplier;
+        var diffrence = (etime - btime) / self.chart.chartWidth * self.zoomMultiplier;
         var begTime = btime + (diffrence * self.delta);
         var endTime = etime - (diffrence * self.delta);
         self.delta = 0;
@@ -980,25 +945,11 @@ var detailChartRenderer = function()
     me.bindEvents = function()
     {
         var self = this;
-        var chartContainer = document.getElementById(self.id);   
-        /*chartContainer.onmousewheel = self.onScrollZoom.bind(self);
-        chartContainer.onmousedown = self.startDrag.bind(self);
-        chartContainer.onmousemove =  self.drag.bind(self);
-        chartContainer.onmouseup = self.stopDrag.bind(self);*/
+        var chartContainer = document.getElementById(self.id); 
         chartContainer.addEventListener("mousewheel" || "onscroll", self.onScrollZoom.bind(self), false);
         chartContainer.addEventListener('mousedown', self.startDrag.bind(self), false);
         chartContainer.addEventListener('mousemove', self.drag.bind(self), false);
         chartContainer.addEventListener('mouseup', self.stopDrag.bind(self), false);
-//        var draggabaleContainer = document.getElementById("draggabaleZone");
-//        draggabaleContainer.addEventListener("mousemove", function(e)
-//        {
-//            var left = e.pageX - draggabaleContainer.offset().left;
-//            if ((left >= 0 && left <= self.onDraggingLeft) || (left >= self.onDraggingRigth && left <= self.divWidth))
-//            {
-//
-//            }
-//        }, false);
-
     };
 
     me.changeTooltipPosition = function(event)
@@ -1006,7 +957,6 @@ var detailChartRenderer = function()
         var self = this;
         self.tooltipX = event.clientX;
         self.tooltipY = event.clientY;
-
     };
 
     me.startDrag = function(event)
@@ -1014,7 +964,8 @@ var detailChartRenderer = function()
         var self = this;
         if (event.which === 1)
         {
-            var chartContainer = document.getElementById(self.id);
+            //
+            var chartContainer = document.getElementById(self.id);            
             if (!self.dragData)
             {
                 var e = event || event;
@@ -1023,15 +974,33 @@ var detailChartRenderer = function()
 
                 if (self.zoomType === 'xy')
                 {
-                   /* if ((left >= 0 && left <= self.onDraggingLeft) || (left >= self.onDraggingRigth && left <= self.divWidth))
+                    event.cancelBubble = true;
+                    event.stopPropagation();
+                    if (left >= self.chart.chartWidth - 100)
+                    {                        
+                        self.dragData = null;
+                    }
+                    else if(top >= self.chart.chartHeight - 25)
                     {
-                        document.body.style.cursor = "move";
-                        self.dragData =
-                                {
-                                    x: e.clientX - chartContainer.offsetLeft,
-                                    y: e.clientY - chartContainer.offsetTop
-                                };
-                    }*/
+                        self.dragData = null;
+                    } 
+                    else if(left <= self.chart.plotLeft)
+                    {
+                        self.dragData = null;
+                    } 
+                    else
+                    {
+                          document.body.style.cursor = "move";
+                          //self.deleteButtons(); 
+                          self.removeSelection();                         
+                          self.dragData =
+                            {
+                                x: e.clientX - chartContainer.offsetLeft,
+                                y: e.clientY - chartContainer.offsetTop,
+                                offsetX: e.offsetX,
+                                offsetY: e.offsetY
+                            };                            
+                    }                 
                 }
                 else
                 {
@@ -1042,7 +1011,12 @@ var detailChartRenderer = function()
                     else if(top >= self.chart.chartHeight - 25)
                     {
                         self.dragData = null;
-                    } else
+                    }
+                    else if(left <= self.chart.plotLeft)
+                    {
+                        self.dragData = null;
+                    } 
+                    else
                     {
                           document.body.style.cursor = "move";
                           self.dragData =
@@ -1082,38 +1056,111 @@ var detailChartRenderer = function()
             var mapDiffY = self.previousStateY - e.clientY;
 
             var begTime = self.chart.xAxis[0].min / 1000;
-            var endTime = self.chart.xAxis[0].max / 1000;
-         
-            /*var minY = [];
-            var maxY = [];
-            var min = [];
-            var max = [];
-            var multiplierY = [];
-            for(var i = 0; i < self.chart.yAxis.length; i++)
-            {
-                minY.push(self.chart.yAxis[i].min);
-                maxY.push(self.chart.yAxis[i].max);
-                multiplierY.push((maxY[i] - minY[i]) / self.divHieght);
-                min.push(minY[i] - mapDiffY * multiplierY[i]);
-                max.push(maxY[i] - mapDiffY * multiplierY[i]);
-            }   */
-
+            var endTime = self.chart.xAxis[0].max / 1000;         
             var multiplier = (endTime - begTime) / self.chart.chartWidth;            
             if (self.zoomType === 'xy')
-            {               
-                btime = begTime + mapDiffX * multiplier;
-                etime = endTime + mapDiffX * multiplier;
-                self.zoomChart(btime, etime, false);
+            {    
+                var xAxis = self.chart.xAxis[0];
+                var yAxis = self.chart.yAxis[0];
+                xAxis.removePlotBand('zoomplotband');
+                yAxis.removePlotBand('zoomplotband');
+                self.resetYAxisAfterRenderTime = false;
+                self.resetXAxisAfterRenderTime = false;
+                //typeof self.rect !== 'undefined' ? self.rect.destroy(); :;
+                if(self.rect !== null)
+                    {self.rect.destroy();}          
+
+                var toValue = xAxis.toValue(self.dragData.offsetX);
+                var fromValue = xAxis.toValue(e.chartX);
+                var from = toValue < fromValue ? fromValue : toValue; 
+                var to = toValue > fromValue ? fromValue : toValue; 
+
+                var toValueY = yAxis.toValue(self.dragData.offsetY);
+                var fromValueY = yAxis.toValue(e.chartY);
+                var fromY = toValueY < fromValueY ? fromValueY : toValueY; 
+                var toY = toValueY > fromValueY ? fromValueY : toValueY;
+
+                var diffX = self.dragData.offsetX > e.chartX ? (self.dragData.offsetX - e.chartX)
+                                                             : (e.chartX - self.dragData.offsetX) ; 
+                var diffY = self.dragData.offsetY > e.chartY ? (self.dragData.offsetY - e.chartY)  
+                                                             : (e.chartY - self.dragData.offsetY);
+                if(diffY <= self.chart.chartHeight / 30)
+                {                    
+                    xAxis.addPlotBand
+                    ({
+                        from: from,
+                        to: to,
+                        color: 'rgba(0, 0, 0, 0.2)',
+                        id: 'zoomplotband'
+                    });
+                    self.resetYAxisAfterRenderTime = true;
+                }
+                if(diffX <= self.chart.chartWidth / 30)
+                {
+                    yAxis.addPlotBand
+                    ({
+                        from: fromY,
+                        to: toY,
+                        color: 'rgba(0, 0, 0, 0.2)',
+                        id: 'zoomplotband'
+                    });
+                    self.resetXAxisAfterRenderTime = true;                    
+                }
+
+                var x = e.chartX;
+                var y = e.chartY;
+                var sx = self.dragData.offsetX;
+                var sy = self.dragData.offsetY;
+                var posX;
+                var posY;
+                var width;
+                var height;
+                if(x < sx && y < sy)
+                {
+                    posX = x;
+                    posY = y;
+                    width = sx - x;
+                    height = sy - y;
+                } 
+                else if(x > sx && y < sy)
+                {
+                    posX = sx;
+                    posY = y;
+                    width = x - sx;
+                    height = sy - y;
+                }
+                else if(x < sx && y > sy)
+                {
+                    posX = x;
+                    posY = sy;
+                    width = sx - x;
+                    height = y - sy;
+                }
+                else if(x > sx && y > sy)
+                {
+                    posX = sx;
+                    posY = sy;
+                    width = x - sx;
+                    height = y - sy;
+                }
+
+
+                self.rect = self.chart.renderer.rect(posX, posY, width, height)
+                    .attr
+                    ({
+                        fill: 'rgba(0, 0, 0, 0.2)',
+                        zIndex: 1
+                    })
+                    .add();       
             }
             else
             {
                 btime = begTime + mapDiffX * multiplier;
                 etime = endTime + mapDiffX * multiplier;
-
-
+                var yAxis;
                 for(var i = 0; i < self.chart.yAxis.length; i++)
                 {
-                    var yAxis = self.chart.yAxis[i];
+                    yAxis = self.chart.yAxis[i];
                     var max = yAxis.max;
                     var min = yAxis.min;
                     var multiplierY = (max - min) / self.divHieght;
@@ -1131,18 +1178,7 @@ var detailChartRenderer = function()
                         yAxis.setExtremes(minY, maxY);
                     }                    
                 }
-
-                self.zoomChart(btime, etime, false);
-                /*for(var i = 0; i < self.chart.yAxis.length; i++)
-                {
-                    self.chart.yAxis[i].options.startOnTick = false;
-                    self.chart.yAxis[i].options.endOnTick = false;
-                    self.chart.yAxis[i].setExtremes(min[i], max[i]);
-                }    */
-
-                
-
-
+                self.zoomChart(btime, etime, false);   
             }
             self.previousStateX = e.clientX;
             self.previousStateY = e.clientY;
@@ -1157,19 +1193,67 @@ var detailChartRenderer = function()
         if (self.dragData)
         {
             self.rebuildAxesControls();
-            var btime = self.chart.xAxis[0].min / 1000;
-            var etime = self.chart.xAxis[0].max / 1000;
-            document.body.style.cursor = "default";
-            if(!self.stopPropagation)
+            if(self.zoomType === 'xy')
             {
-                self.refreshChart(btime, etime);
-            }            
-            self.dragData = null;
-            self.previousStateX = null;
-            self.previousStateY = null;
+                self.dragData = null;
+                self.previousStateX = null;
+                self.previousStateY = null;
+                var box = self.rect.getBBox();
+                var xAxis = self.chart.xAxis[0];
+                var beginTime = self.resetXAxisAfterRenderTime ? xAxis.min : xAxis.toValue(box.x);
+                var endTime = self.resetXAxisAfterRenderTime ? xAxis.max : xAxis.toValue(box.x + box.width);
+                self.selectedXExtremes = {beginTime: beginTime, endTime: endTime};
+                self.callCallbacks(beginTime / 1000, endTime / 1000);
+                self.setUpYExtremes(box);
+                self.renderButtons();     
+                event.cancelBubble = true;
+                event.stopPropagation();                    
+                document.body.style.cursor = "default";
+            }
+            else
+            {
+                var btime = self.chart.xAxis[0].min / 1000;
+                var etime = self.chart.xAxis[0].max / 1000;                
+                document.body.style.cursor = "default";
+                if(!self.stopPropagation)
+                {
+                    self.refreshChart(btime, etime);
+                }            
+                self.dragData = null;
+                self.previousStateX = null;
+                self.previousStateY = null;
+            }               
         }
     };
 
+    me.removeSelection = function(e)
+    {
+        var self = this;        
+        self.deleteButtons();
+        var xAxis = self.chart.xAxis[0];
+        var yAxis = self.chart.yAxis[0];
+        xAxis.removePlotBand('zoomplotband');
+        yAxis.removePlotBand('zoomplotband');       
+        if(self.rect !== null)
+        {
+            self.rect.destroy();
+            self.rect = null;
+        }  
+    };
+
+    me.setUpYExtremes = function(box)
+    {
+        var self = this;
+        self.selectedYExtremes = [];
+        for(var i = 0; i < self.chart.yAxis.length; i++)
+        {
+            var yAxis = self.chart.yAxis[i];
+            var min = self.resetYAxisAfterRenderTime ? yAxis.min : yAxis.toValue(box.y + box.height);
+            var max = self.resetYAxisAfterRenderTime ? yAxis.max : yAxis.toValue(box.y);
+            var extremes = {min: min, max: max};
+            self.selectedYExtremes.push(extremes);
+        }
+    };
 
     me.resetYAxis = function()
     {
@@ -1241,7 +1325,7 @@ var detailChartRenderer = function()
         self.isLegendEnabled = false;
         self.formChart(self.id, self.series);
         self.chart = jQuery('#' + self.id).highcharts();
-        for(var i = 0; i < self.chart.yAxis.length; i++)
+        for(i = 0; i < self.chart.yAxis.length; i++)
         {
             self.chart.yAxis[i].options.startOnTick = false;
             self.chart.yAxis[i].options.endOnTick = false;
@@ -1264,9 +1348,10 @@ var detailChartRenderer = function()
         window.event.stopPropagation();
         if(!self.stopPropagation)
         {
-            self.resetYAxisAfterRenderTime = true; 
-            self.refreshChart(parseInt(self.initialBeginTime), parseInt(self.initialEndTime));
-            self.masterChart.changePlotbands(parseInt(self.initialBeginTime) * 1000, parseInt(self.initialEndTime) * 1000); 
+            self.setUpNeedenExtremes = false; 
+            self.refreshChart(parseInt(self.initialBeginTime, 10), parseInt(self.initialEndTime, 10));
+            self.masterChart.changePlotbands(parseInt(self.initialBeginTime, 10) * 1000, parseInt(self.initialEndTime, 10) * 1000); 
+            self.resetYAxis();
        }
     };
 
@@ -1278,7 +1363,7 @@ var detailChartRenderer = function()
 
         var yAxes = document.getElementsByClassName("highcharts-axis-labels highcharts-yaxis-labels");  
         var xAxisSize = document.getElementsByClassName("highcharts-axis-labels highcharts-xaxis-labels")[1].getBBox();
-        labelGroupBBox = self.chart.renderer.rect(xAxisSize.x, xAxisSize.y, xAxisSize.width, xAxisSize.height)
+        var labelGroupBBox = self.chart.renderer.rect(xAxisSize.x, xAxisSize.y, xAxisSize.width, xAxisSize.height)
         .attr({
             class: 'xAxisControl',
             fill: '#fff',
@@ -1295,10 +1380,10 @@ var detailChartRenderer = function()
             var axisBox = yAxes[i + 1].getBBox();
             var yAxis = self.chart.yAxis[i];
 
-            bBoxWidth = axisBox.width + 20;
-            bBoxHeight = axisBox.height;
-            bBoxX = axisBox.x - 10;
-            bBoxY = axisBox.y;
+            var bBoxWidth = axisBox.width + 20;
+            var bBoxHeight = axisBox.height;
+            var bBoxX = axisBox.x - 10;
+            var bBoxY = axisBox.y;
 
             labelGroupBBox = self.chart.renderer.rect(bBoxX, bBoxY, bBoxWidth, bBoxHeight)
             .attr({
@@ -1318,36 +1403,15 @@ var detailChartRenderer = function()
             var downYValue;
 
             var rectangles = document.getElementsByClassName('axisControl');
-            var rect = rectangles[i];
-            var downYValue;
+            var rect = rectangles[i];           
 
             rectangles[i].onmousedown = function(yAxis, rect)
             { 
                 return function(e)
                 {   
-                    isDragging = true;  
-                    //if(self.zoomType !== 'xy')
-                    //{
-                        window.event.cancelBubble = true;
-                        window.event.stopPropagation();
-                    //}   
-                    /*var higherPosition = rect.getBBox().height / 2 - 100;
-                    var downPosition = higherPosition + 200;
-                    if(e.offsetY < higherPosition)
-                    {
-                        isDraggingMaxExtreme = true;       
-                        isDraggingMinExtreme = false;                 
-                    }
-                    else if(e.offsetY > downPosition)
-                    {
-                        isDraggingMinExtreme = true;
-                        isDraggingMaxExtreme = false;
-                    }
-                    else
-                    {
-                        isDraggingMaxExtreme = false;
-                        isDraggingMinExtreme = false;
-                    } */                
+                    isDragging = true;                      
+                    window.event.cancelBubble = true;
+                    window.event.stopPropagation();                     
                 };
             }(yAxis, rect);
 
@@ -1371,42 +1435,17 @@ var detailChartRenderer = function()
                         {self.divHieght = 800;}
                         var multiplierY = (max - min) / self.chart.chartHeight;
                         var minY = parseFloat(min - mapDiffY * multiplierY);
-                        var maxY = parseFloat(max - mapDiffY * multiplierY);    
-
-                        /*extremes = yAxis.getExtremes(),
-                        userMin = extremes.userMin,
-                        userMax = extremes.userMax,
-                        dataMin = extremes.dataMin,
-                        dataMax = extremes.dataMax,
-
-                        minimum = userMin !== undefined ? userMin : dataMin,
-                        maximum = userMax !== undefined ? userMax : dataMax;*/
+                        var maxY = parseFloat(max - mapDiffY * multiplierY);   
 
                         if(yAxis.oldUserMax !== maxY &&
                             yAxis.oldUserMin !== minY &&
                             yAxis.oldMax !== maxY &&
                             yAxis.oldMin !== minY)
-                        {
-                            /*if(isDraggingMinExtreme)
-                            {
-                                yAxis.options.startOnTick = false;
-                                yAxis.options.endOnTick = false;
-                                minY = minY > dataMin ? minY : dataMin;
-                                yAxis.setExtremes(minY, max, true, false);
-                            } else if(isDraggingMaxExtreme)
-                            {
-                                yAxis.options.startOnTick = false;
-                                yAxis.options.endOnTick = false;
-                                maxY = maxY > dataMax ? maxY : dataMax;                                
-                                yAxis.setExtremes(min, maxY, true, false);
-                            }
-                            else 
-                            {*/
-                                yAxis.options.startOnTick = false;
-                                yAxis.options.endOnTick = false;
-                                yAxis.options.tickInterval = yAxis.tickInterval;
-                                yAxis.setExtremes(minY, maxY, true, false);
-                        //    }                            
+                        {                        
+                            yAxis.options.startOnTick = false;
+                            yAxis.options.endOnTick = false;
+                            yAxis.options.tickInterval = yAxis.tickInterval;
+                            yAxis.setExtremes(minY, maxY, true, false);                                             
                         } 
 
                     }
@@ -1442,18 +1481,7 @@ var detailChartRenderer = function()
                     isDraggingMinExtreme = false;
                     isDraggingMaxExtreme = false;                    
                 };
-            }(yAxis, rect);
-
-            /*rectangles[i].ondblclick = function(yAxis, rect)
-            { 
-                return function(e)
-                {                
-                    var extremes = yAxis.getExtremes(),
-                    dataMin = extremes.dataMin,
-                    dataMax = extremes.dataMax;
-                    yAxis.setExtremes(dataMin, dataMax, true, false);
-                };
-            }(yAxis, rect);*/
+            }(yAxis, rect);           
 
             rectangles[i].onmousewheel = function(yAxis, rect)
             { 
@@ -1477,13 +1505,7 @@ var detailChartRenderer = function()
                         var prevTick = yAxis.tickInterval;       
                         yAxis.options.startOnTick = true;
                         yAxis.options.endOnTick = true;                        
-                        yAxis.options.tickInterval = (tick);
-                        //yAxis.options.tickPixelInterval = 100;
-                        //yAxis.options.allowDecimals = false;
-                        //yAxis.options.ordinal = false;
-                        //yAxis.options.min = newMin;
-                        //yAxis.options.max = newMax;
-                        //if(self.delta < 0){newMax = newMax - self.delta * tick}
+                        yAxis.options.tickInterval = (tick);                       
                         yAxis.setExtremes(newMin, newMax, true, true);      
                         yAxis.options.startOnTick = false;
                         yAxis.options.endOnTick = false;                    
@@ -1528,7 +1550,7 @@ var detailChartRenderer = function()
         var sourceWidth;
         if(document.getElementById('main_sidebar_source').offsetWidth > document.getElementById('main_sidebar_controls').offsetWidth)
         {sourceWidth = document.getElementById('main_sidebar_source').offsetWidth;}
-        else{sourceWidth = document.getElementById('main_sidebar_controls').offsetWidth}
+        else{sourceWidth = document.getElementById('main_sidebar_controls').offsetWidth;}
         self.chart.setSize(
             jQuery(window).width() - sourceWidth, 
             jQuery(window).height() - document.getElementById('header_div').offsetHeight - 100  - 70,
@@ -1558,7 +1580,7 @@ var detailChartRenderer = function()
         self.isLegendEnabled = true;
         self.formChart(self.id, self.series);
         self.chart = jQuery('#' + self.id).highcharts();
-        for(var i = 0; i < self.chart.yAxis.length; i++)
+        for(i = 0; i < self.chart.yAxis.length; i++)
         {
             self.chart.yAxis[i].options.startOnTick = false;
             self.chart.yAxis[i].options.endOnTick = false;
@@ -1573,119 +1595,120 @@ var detailChartRenderer = function()
     me.showLabels = function(e)
     {
         var self = this;
-        var points = [];        
-        var msg = '<div class="ui-dialog">';
-        var heightY = chart.chart.plotHeight / 500;        
-        var clientY = this.plotY;
-        var max = clientY + heightY;
-        var min = clientY - heightY;
-        var seriesToMove;
-        var dataSourceOfMovingSeries;
-        for(var i = 0; i < chart.chart.series.length; i++)
-        {            
-            var minx = chart.chart.series[i].xAxis.min;
-            var maxx = chart.chart.series[i].xAxis.max;
-            var diffrencex = (maxx - minx) / 200; 
-            for(var j = 0; j < chart.chart.series[i].points.length; j++)
-            {                             
-                var y = chart.chart.series[i].points[j].plotY;  
-                var date = chart.chart.series[i].points[j].x;
-                var value = chart.chart.series[i].points[j].y;
-
-                if(date <= (this.x + diffrencex) && date >= (this.x - diffrencex) 
-                    && y <= (max) && y >= (min))
-                {
-                    seriesToMove = chart.chart.series[i];
-                    dataSourceOfMovingSeries = chart.dataSourcesToChannels[i];
-                    msg = msg + '</br><strong>Data source:</strong>' + chart.dataSourcesToChannels[i] +
-                     '</br><strong>Channel:</strong> ' + chart.chart.series[i].name + 
-                     '</br><strong>Date:</strong> ' + Highcharts.dateFormat('%Y-%m-%d %H:%M:%S.%L', date) + 
-                     '</br><strong>Value:</strong> ' + value + '</br>';
-                    break;
-                }           
-            }
-        }    
-        var buttons;    
-        var axesRelations = chart.getAxesRelations(dataSourceOfMovingSeries);        
-        if(seriesToMove.yAxis.options.id === 'temporary')
+        if(chart.rect === null)
         {
-           buttons =  {"Delete this series from the temporary axis": function()
-            {
-                var flag;
-                var needenAxis;
-                if(seriesToMove.yAxis.series.length === 1)
-                {
-                    flag = true;                  
-                } 
-                for(var i = 0; i < axesRelations.length; i++)
-                {
-                    if(seriesToMove.options.channelNumber === axesRelations[i].channelNumber)
-                    {
-                        needenAxis = axesRelations[i].currentAxis = axesRelations[i].value;
-                        break;
-                    }
-                }                           
-                var jSONSeries = JSON.stringify(seriesToMove.options);
-                var series = JSON.parse(jSONSeries);                    
-                seriesToMove.remove();
-                series.yAxis = needenAxis;
-                series.color = chart.chart.get(needenAxis).options.labels.style.color;
-                series.lineWidth = 1;
-                chart.chart.addSeries(series, true);                    
-                if(flag)
-                {
-                    var temporaryAxis = chart.chart.get('temporary');
-                    temporaryAxis.remove();
-                    chart.axesToShow.splice(chart.axesToShow.length, 1);
-                }           
-                chart.rebuildAxesControls();   
-            }}                   
-        }
-        else
-        {
-            if(seriesToMove.yAxis.series.length !== 1)
+            var points = [];        
+            var msg = '<div class="ui-dialog">';
+            var heightY = chart.chart.plotHeight / 500;        
+            var clientY = this.plotY;
+            var max = clientY + heightY;
+            var min = clientY - heightY;
+            var seriesToMove;
+            var dataSourceOfMovingSeries;
+            for(var i = 0; i < chart.chart.series.length; i++)
             {            
-                buttons = {"Show last series on another axis": function()
-                {   
+                var minx = chart.chart.series[i].xAxis.min;
+                var maxx = chart.chart.series[i].xAxis.max;
+                var diffrencex = (maxx - minx) / 200; 
+                for(var j = 0; j < chart.chart.series[i].points.length; j++)
+                {                             
+                    var y = chart.chart.series[i].points[j].plotY;  
+                    var date = chart.chart.series[i].points[j].x;
+                    var value = chart.chart.series[i].points[j].y;
+
+                    if(date <= (this.x + diffrencex) && date >= (this.x - diffrencex) 
+                        && y <= (max) && y >= (min))
+                    {
+                        seriesToMove = chart.chart.series[i];
+                        dataSourceOfMovingSeries = chart.dataSourcesToChannels[i];
+                        msg = msg + '</br><strong>Data source:</strong>' + chart.dataSourcesToChannels[i] +
+                         '</br><strong>Channel:</strong> ' + chart.chart.series[i].name + 
+                         '</br><strong>Date:</strong> ' + Highcharts.dateFormat('%Y-%m-%d %H:%M:%S.%L', date) + 
+                         '</br><strong>Value:</strong> ' + value + '</br>';
+                        break;
+                    }           
+                }
+            }    
+            var buttons;    
+            var axesRelations = chart.getAxesRelations(dataSourceOfMovingSeries);        
+            if(seriesToMove.yAxis.options.id === 'temporary')
+            {
+               buttons =  {"Delete this series from the temporary axis": function()
+                {
+                    var flag;
+                    var needenAxis;
+                    if(seriesToMove.yAxis.series.length === 1)
+                    {
+                        flag = true;                  
+                    } 
                     for(var i = 0; i < axesRelations.length; i++)
                     {
                         if(seriesToMove.options.channelNumber === axesRelations[i].channelNumber)
-                        {                            
-                            axesRelations[i].currentAxis = 'temporary';
+                        {
+                            needenAxis = axesRelations[i].currentAxis = axesRelations[i].value;
                             break;
                         }
-                    }
-                    var temporaryAxis = chart.chart.get('temporary');
-                    if(!temporaryAxis)
-                    {
-                        chart.chart.addAxis(chart.temporaryAxis, false, false);                        
-                    }                      
+                    }                           
                     var jSONSeries = JSON.stringify(seriesToMove.options);
-                    var series = JSON.parse(jSONSeries);
+                    var series = JSON.parse(jSONSeries);                    
                     seriesToMove.remove();
-                    series.yAxis = 'temporary';
-                    series.color = chart.temporaryAxis.labels.style.color;
+                    series.yAxis = needenAxis;
+                    series.color = chart.chart.get(needenAxis).options.labels.style.color;
                     series.lineWidth = 1;
-                    chart.chart.addSeries(series, true);
-                    chart.rebuildAxesControls();                                   
+                    chart.chart.addSeries(series, true);                    
+                    if(flag)
+                    {
+                        var temporaryAxis = chart.chart.get('temporary');
+                        temporaryAxis.remove();
+                        chart.axesToShow.splice(chart.axesToShow.length, 1);
+                    }           
+                    chart.rebuildAxesControls();   
                 }
-                };
-             }
+                };                   
+            }
+            else
+            {
+                if(seriesToMove.yAxis.series.length !== 1)
+                {            
+                    buttons = {"Show last series on another axis": function()
+                    {   
+                        for(var i = 0; i < axesRelations.length; i++)
+                        {
+                            if(seriesToMove.options.channelNumber === axesRelations[i].channelNumber)
+                            {                            
+                                axesRelations[i].currentAxis = 'temporary';
+                                break;
+                            }
+                        }
+                        var temporaryAxis = chart.chart.get('temporary');
+                        if(!temporaryAxis)
+                        {
+                            chart.chart.addAxis(chart.temporaryAxis, false, false);                        
+                        }                      
+                        var jSONSeries = JSON.stringify(seriesToMove.options);
+                        var series = JSON.parse(jSONSeries);
+                        seriesToMove.remove();
+                        series.yAxis = 'temporary';
+                        series.color = chart.temporaryAxis.labels.style.color;
+                        series.lineWidth = 1;
+                        chart.chart.addSeries(series, true);
+                        chart.rebuildAxesControls();                                   
+                    }
+                    };
+                 }
+            }
+            msg = msg + '</div>';
+            jQuery(msg).dialog({
+                dialogClass: 'dialog',
+                title: 'Point info',
+                position: [e.clientX + 10, e.clientY + 10],
+                closeText: 'Close',
+                width: 'auto',
+                maxWidth: 1000,
+                height: 'auto',
+                buttons: buttons            
+            });
         }
-        msg = msg + '</div>';
-        jQuery(msg).dialog({
-            dialogClass: 'dialog',
-            title: 'Point info',
-            position: [e.clientX + 10, e.clientY + 10],
-            closeText: 'Close',
-            width: 'auto',
-            maxWidth: 1000,
-            height: 'auto',
-            buttons: buttons
-            /*close: function() {
-                jQuery('#message' + this.x).remove();
-            }*/
-        });
 
     };
 
@@ -1808,7 +1831,8 @@ var detailChartRenderer = function()
     me.changeZoomTypeToMap = function()
     {
         var self = this;
-        var begTime = self.chart.xAxis[0].min;
+        self.zoomType = '';
+        /*var begTime = self.chart.xAxis[0].min;
         var endTime = self.chart.xAxis[0].max;
         var max = [];        
         var min = []; 
@@ -1819,11 +1843,11 @@ var detailChartRenderer = function()
         }   
 
 
-        self.zoomType = '';
+        
         self.chart.destroy();
         self.formChart(self.id, self.series);
         self.chart = jQuery('#' + self.id).highcharts();
-        for(var i = 0; i < self.chart.yAxis.length; i++)
+        for(i = 0; i < self.chart.yAxis.length; i++)
         {
             self.chart.yAxis[i].options.startOnTick = false;
             self.chart.yAxis[i].options.endOnTick = false;
@@ -1832,13 +1856,14 @@ var detailChartRenderer = function()
         self.chart.xAxis[0].setExtremes(begTime, endTime, false);
         self.masterChart.changePlotbands(begTime, endTime);
         self.chart.redraw();
-        self.rebuildAxesControls();
+        self.rebuildAxesControls();*/
     };
 
     me.changeZoomTypeToXY = function()
     {
         var self = this;
-        var begTime = self.chart.xAxis[0].min;
+        self.zoomType = 'xy';
+        /*var begTime = self.chart.xAxis[0].min;
         var endTime = self.chart.xAxis[0].max;
         var max = [];        
         var min = []; 
@@ -1849,10 +1874,10 @@ var detailChartRenderer = function()
         }   
 
 
-        self.zoomType = 'xy';
+        
         self.formChart(self.id, self.series);
         self.chart = jQuery('#' + self.id).highcharts();
-        for(var i = 0; i < self.chart.yAxis.length; i++)
+        for(i = 0; i < self.chart.yAxis.length; i++)
         {
             self.chart.yAxis[i].options.startOnTick = false;
             self.chart.yAxis[i].options.endOnTick = false;
@@ -1862,7 +1887,7 @@ var detailChartRenderer = function()
         self.chart.xAxis[0].setExtremes(begTime, endTime, false);
         self.masterChart.changePlotbands(begTime, endTime);
         self.chart.redraw();
-        self.rebuildAxesControls();      
+        self.rebuildAxesControls();  */    
     };
 
     me.changeMasterChartSeries = function(seriesId)
@@ -1908,7 +1933,7 @@ var detailChartRenderer = function()
         }
         else
         {
-            throw 'Error while getting experiment interval from the server.'
+            throw 'Error while getting experiment interval from the server.';
         }
     };
 
@@ -1940,7 +1965,7 @@ var detailChartRenderer = function()
             }
         }
         return true;
-    }
+    };
 
     me.getAllAxes = function()
     {
@@ -1984,17 +2009,19 @@ var detailChartRenderer = function()
 
    me.stringtoXML = function(text)
    {
+        var doc;
         if (window.ActiveXObject)
         {
-    	    var doc=new ActiveXObject('Microsoft.XMLDOM');
+    	    doc = new window.ActiveXObject('Microsoft.XMLDOM');
     	    doc.async='false';
     	    doc.loadXML(text);
-        } else 
+        } 
+        else 
         {
-	    var parser=new DOMParser();
-    	    var doc=parser.parseFromString(text,'text/xml');
-	}
-	return doc;
+    	    var parser = new window.DOMParser();
+        	doc = parser.parseFromString(text,'text/xml');
+	    }
+	   return doc;
     };
 
     me.formNeedenAxes = function(dataSource)
@@ -2026,10 +2053,10 @@ var detailChartRenderer = function()
 
         var needenIds = [];
         needenIds.push(dataSource.axesToChannels[0]);
-        
+        var flag;
         for (var i = 0; i < dataSource.axesToChannels.length; i++)
         {
-            var flag = false;
+            flag = false;
             for(var j = 0; j < needenIds.length; j++)
             {
                 if(needenIds[j].value === dataSource.axesToChannels[i].value)
@@ -2045,9 +2072,9 @@ var detailChartRenderer = function()
         }
 
         self.needenAxes = needenIds;
-        axesToShow = [];
+        var axesToShow = [];
         var counter = 1;
-        var flag = false;
+        flag = false;
         for(var i = 0; i < self.axes.length; i++)
         {
     	    if(counter > Highcharts.getOptions().colors.length - 1)
@@ -2056,24 +2083,23 @@ var detailChartRenderer = function()
     	    }
             var axesObj = {value: '',labels: {format: '{value} ', style: { color: Highcharts.getOptions().colors[counter]}}, title: {text: '', style: { color: Highcharts.getOptions().colors[counter]}}};
             counter++;
-            for(j = 0; j < self.needenAxes.length; j++)
+            for(var j = 0; j < self.needenAxes.length; j++)
             {
-        	if(typeof self.needenAxes[j] === 'undefined')
+            	if(typeof self.needenAxes[j] === 'undefined')
                 {
             	    flag = true;
             	    axesToShow.push({gridLineWidth: 0, id: 'standart',labels: {format: '{value}', style: { color: Highcharts.getOptions().colors[0]}}, title: {text: 'Standart axis', style: { color: Highcharts.getOptions().colors[0]}}});
             	    continue;    	    
-        	}
-        	else
-        	{        	    
-            	    if(self.needenAxes[j].value === null && flag === false)
-            	    {
-                	flag = true;
-                	axesToShow.push({gridLineWidth: 0, id: 'standart',labels: {format: '{value}', style: { color: Highcharts.getOptions().colors[0]}}, title: {text: 'Standart axis', style: { color: Highcharts.getOptions().colors[0]}}});
-                	continue;
-            	    }
-        	}
-            	 
+            	}
+            	else
+            	{        	    
+                	    if(self.needenAxes[j].value === null && flag === false)
+                	    {
+                        	flag = true;
+                        	axesToShow.push({gridLineWidth: 0, id: 'standart',labels: {format: '{value}', style: { color: Highcharts.getOptions().colors[0]}}, title: {text: 'Standart axis', style: { color: Highcharts.getOptions().colors[0]}}});
+                        	continue;
+                	    }
+            	}            	 
                 if(self.needenAxes[j].value === self.axes[i].value)
                 {
                     if(j !== 0)
@@ -2251,23 +2277,26 @@ var detailChartRenderer = function()
         var min = xAxis.min;
         var multiplierX = (max - min) / 4;
         var minX = min - multiplierX;
-        var maxX = max - multiplierX;         
+        var maxX = max - multiplierX;  
         xAxis.options.startOnTick = false;
-        xAxis.options.endOnTick = false;
-        xAxis.setExtremes(minX, maxX);  
-        self.masterChart.changePlotbands(minX, maxX);
-        self.moovingLeftCount++;
-        self.addStateInHistory(minX / 1000, maxX / 1000);
-        minX = minX / 1000 < parseInt(self.initialBeginTime) ? parseInt(self.initialBeginTime) * 1000 : minX;
-        maxX = maxX / 1000 > parseInt(self.initialEndTime) ? parseInt(self.initialEndTime) * 1000 : maxX;
-        if(self.moovingLeftCount > 3)
+        xAxis.options.endOnTick = false;  
+        minX = minX / 1000 >= parseInt(self.initialBeginTime, 10) ? minX : parseInt(self.initialBeginTime, 10) * 1000;
+        maxX = maxX / 1000 <= parseInt(self.initialEndTime, 10) ? maxX : parseInt(self.initialEndTime, 10) * 1000;       
+        if(min / 1000 > parseInt(self.initialBeginTime, 10) || max / 1000 < parseInt(self.initialEndTime, 10))
         {
-            if(!self.stopPropagation)
+            self.masterChart.changePlotbands(minX, maxX);            
+            self.addStateInHistory(minX / 1000, maxX / 1000); 
+            self.moovingRightCount++; 
+            xAxis.setExtremes(minX, maxX); 
+            if(self.moovingRightCount > 3)
             {
-                self.refreshChart(minX / 1000, maxX / 1000);
-                self.moovingLeftCount = 0;
+                if(!self.stopPropagation)
+                {
+                    self.refreshChart(minX / 1000, maxX / 1000);
+                    self.moovingRightCount = 0;
+                }  
             }  
-        }                             
+        }                          
     };
 
     me.onMovingRight = function(e)
@@ -2281,23 +2310,26 @@ var detailChartRenderer = function()
         var min = xAxis.min;
         var multiplierX = (max - min) / 4;
         var minX = min + multiplierX;
-        var maxX = max + multiplierX;         
+        var maxX = max + multiplierX;  
         xAxis.options.startOnTick = false;
-        xAxis.options.endOnTick = false;
-        xAxis.setExtremes(minX, maxX);  
-        self.masterChart.changePlotbands(minX, maxX);
-        self.moovingRightCount++;
-        self.addStateInHistory(minX / 1000, maxX / 1000);
-        minX = minX / 1000 < parseInt(self.initialBeginTime) ? parseInt(self.initialBeginTime) * 1000 : minX;
-        maxX = maxX / 1000 > parseInt(self.initialEndTime) ? parseInt(self.initialEndTime) * 1000 : maxX;
-        if(self.moovingRightCount > 3)
+        xAxis.options.endOnTick = false;  
+        minX = minX / 1000 >= parseInt(self.initialBeginTime, 10) ? minX : parseInt(self.initialBeginTime, 10) * 1000;
+        maxX = maxX / 1000 <= parseInt(self.initialEndTime, 10) ? maxX : parseInt(self.initialEndTime, 10) * 1000;
+        if(min / 1000 >= parseInt(self.initialBeginTime, 10) || max / 1000 <= parseInt(self.initialEndTime, 10))
         {
-            if(!self.stopPropagation)
+            self.masterChart.changePlotbands(minX, maxX);            
+            self.addStateInHistory(minX / 1000, maxX / 1000); 
+            self.moovingRightCount++; 
+            xAxis.setExtremes(minX, maxX); 
+            if(self.moovingRightCount > 3)
             {
-                self.refreshChart(minX / 1000, maxX / 1000);
-                self.moovingRightCount = 0;
+                if(!self.stopPropagation)
+                {
+                    self.refreshChart(minX / 1000, maxX / 1000);
+                    self.moovingRightCount = 0;
+                }  
             }  
-        }  
+        }
     };
 
     me.addButtonInControls = function(text, callback)
@@ -2311,30 +2343,86 @@ var detailChartRenderer = function()
         }, text: text});
     };
 
-    me.addButton = function(buttonName, x, y, callback)
+    me.addButton = function(iconClass, callback)
     {
-        var self = this;        
-        self.chart.renderer.button(buttonName, x, y, function()
-        {
-            var min = self.chart.xAxis[0].min / 1000;
-            var max = self.chart.xAxis[0].max / 1000;
-            callback(min, max);
-        }, { zIndex: 20}).add();
+        var self = this;
+        var button = {text: false, label: false, icons: {primary: 'ui-icon ' + iconClass},
+        onclick: function()
+        {            
+            self.removeSelection();
+            callback(self.selectedXExtremes.beginTime / 1000, self.selectedXExtremes.endTime / 1000);
+        }};
+        self.buttons.push(button)
     };
+
+    me.renderButtons = function()
+    {
+        var self = this;
+        var pos = self.rect.getBBox();
+        var containerPos = jQuery('#' + self.id).position();      
+        var container = document.getElementById('moduleChart');      
+        var multiplierPos;
+        for(var i = 0; i < self.buttons.length; i++)
+        {
+            multiplierPos = i * 16; 
+            var buttonContainer = document.createElement('div');       
+            buttonContainer.id = 'selectionButtons' + i;
+            buttonContainer.style.left = containerPos.left + pos.x + pos.width + 'px';
+            buttonContainer.style.top = containerPos.top + pos.y + pos.height - multiplierPos + 'px';
+            buttonContainer.style.position = 'absolute';
+            container.appendChild(buttonContainer);
+            jQuery('#selectionButtons' + i).button(self.buttons[i]).click(self.buttons[i].onclick);            
+        }
+    };
+
+    me.deleteButtons = function()
+    {
+        var self = this;
+        for(var i = 0; i < self.buttons.length; i++)
+        {
+            jQuery('#selectionButtons' + i).remove();
+        }        
+    };
+
+   
 
     me.addStateInHistory = function(beginTime, endTime)
     {
         var self = this;
-        var axesExtremes = [];
-        /*for(var i = 0; i < self.chart.yAxis.length; i++)
-        {
-            var axisExtremes = {min: self.chart.yAxis[i].min, max: self.chart.yAxis[i].max};
-            axesExtremes.push(axisExtremes);
-        }*/
+        var axesExtremes = [];        
         if(!self.isHistoryMoving)
         {
             self.historyHandler.addWindow(beginTime, endTime, axesExtremes);
         } 
+    };
+
+    me.addCallbackOnChartRefreshing = function(callback)
+    {
+        var self = this;
+        self.callbacksOnRefreshing.push(callback);
+    }
+
+    me.createDivs = function()
+    {
+        var self = this;
+        var container = document.getElementById(self.containerId);
+        var detailChart = document.createElement('div');
+        var mooveDiv = document.createElement('div');
+        var masterChart = document.createElement('div');
+        mooveDiv.id = 'mooveDiv';
+        detailChart.id = self.id;
+        detailChart.style.position = 'absolute';
+        masterChart.id = self.masterChartId;
+        masterChart.style.flow = 'auto';
+        masterChart.style.height = '150px';
+        mooveDiv.appendChild(masterChart);
+        container.appendChild(mooveDiv);
+        container.appendChild(detailChart);
+    };
+
+    me.export = function()
+    {
+        data_export.Export(true);
     };
 
     me.GetNode = function(){};
@@ -2361,12 +2449,23 @@ var detailChartRenderer = function()
                         text: 'To XY zoom type'
                     }];
 
+    me.buttons = [{
+                    label: false,
+                    text: false,
+                    icons: {primary: 'ui-icon ui-icon-arrowreturnthick-1-s'},
+                    onclick: me.onZoomEvent.bind(me)
+                },
+                {
+                    label: false,
+                    text: false,
+                    icons: {primary: 'ui-icon-arrowthickstop-1-s'},
+                    onclick: me.export, 
+                }];
+
+    me.createDivs();
     me.axes = me.getAllAxes();
     me.masterChart.setUpDetailChart(me);
-
     return me;
-
-
 
 
 

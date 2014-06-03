@@ -1,5 +1,7 @@
 var masterChartRenderer = function()
 {
+    "use strict";
+
     var me = {};
 
     me.id = '';
@@ -33,7 +35,7 @@ var masterChartRenderer = function()
 
     me.isOptimalView = false;
 
-    me.controlsVisibility = 'none'
+    me.controlsVisibility = 'none';
 
 
     me.renderMasterChar = function(id, series, seriesNumber)
@@ -52,7 +54,7 @@ var masterChartRenderer = function()
         self.endTime = ser.data[ser.data.length - 1][0];
         ser.name = series.name;
         ser.pointInterval = series.pointInterval;
-        me.series.push(ser);
+        self.series.push(ser);
 
         jQuery('#' + id).highcharts(
                 {
@@ -196,11 +198,7 @@ var masterChartRenderer = function()
                                 theme: 
                                 {
                                     zIndex: 20
-                                },      
-                                /*menuItems: 
-                                [{
-                                     
-                                }]*/
+                                }  
                             }
                         }
                     }
@@ -244,7 +242,7 @@ var masterChartRenderer = function()
     {
         var self = this;
         self.chart.setTitle({ text: self.title + ' - ' + dataSourceTitle});
-    }
+    };
 
     me.buildControls = function(width)
     {
@@ -348,56 +346,37 @@ var masterChartRenderer = function()
 	var self = this;
 	if(self.chart !== null)
 	{
-    	var x = event.offsetX; //- self.chart.plotLeft; 
-        var plotBandBefore = self.chart.xAxis[0].plotLinesAndBands[0];
-        var plotBandAfter = self.chart.xAxis[0].plotLinesAndBands[1];       
+    	var x = event.offsetX; 
+        var plotBandBefore;
+        var plotBandAfter;
+        var begTime;      
+        var endTime;        
         if(self.onlyDragging)
         {
             plotBandBefore = self.chart.xAxis[0].plotLinesAndBands[2];            
             plotBandAfter = self.chart.xAxis[0].plotLinesAndBands[2];
-            var begTime = plotBandBefore.options.value;
-            var endTime = plotBandAfter.options.value; 
+            begTime = plotBandBefore.options.value;
+            endTime = plotBandAfter.options.value; 
         }
         else
         {
             plotBandBefore = self.chart.xAxis[0].plotLinesAndBands[0];
             plotBandAfter = self.chart.xAxis[0].plotLinesAndBands[1];
-            var begTime = plotBandBefore.options.to;
-            var endTime = plotBandAfter.options.from; 
+            begTime = plotBandBefore.options.to;
+            endTime = plotBandAfter.options.from; 
         }            
         var startPoint;
-        var endPoint;
-        /*for(var i = 0; i < self.chart.series[0].points.length; i++)     
-        {
-            var date = self.chart.series[0].points[i].x;
-            if(begTime < date)
-            {
-                startPoint = self.chart.series[0].points[i];
-                for(var j = i; j < self.chart.series[0].points.length; j++)
-                {
-                    date = self.chart.series[0].points[j].x;
-                    if(endTime < date)
-                    {
-                        endPoint = self.chart.series[0].points[j];
-                        break;
-                    }
-                }
-                break;
-            }
-        }*/
-
+        var endPoint;   
         if(typeof plotBandBefore.svgElem !== 'undefined' && typeof plotBandAfter.svgElem !== 'undefined')
         {
-            startPoint = plotBandBefore.svgElem.element.getBBox();
-            endPoint = plotBandAfter.svgElem.element.getBBox();
-            startPoint = startPoint.x + startPoint.width;
-            endPoint = endPoint.x;
+            startPoint = plotBandBefore.svgElem.element.getBBox().x + plotBandBefore.svgElem.element.getBBox().width;
+            endPoint = plotBandAfter.svgElem.element.getBBox().x;          
             if(self.onlyDragging) 
             {   
                 if((endPoint - self.dragBordersWidth) <= x && (endPoint + self.dragBordersWidth) >= x)
                 {
-                    btime = self.detailChart.chart.xAxis[0].min;
-                    etime = self.detailChart.chart.xAxis[0].max;
+                    var btime = self.detailChart.chart.xAxis[0].min;
+                    var etime = self.detailChart.chart.xAxis[0].max;
                     self.dragData =
                     {
                         x: event.offsetX,
@@ -406,8 +385,7 @@ var masterChartRenderer = function()
                         endTime: etime
                     };  
                     self.dragRightBorder = false;
-                    self.dragLeftBorder = false;
-                    //event.cancelBubble = true;
+                    self.dragLeftBorder = false;                 
                     event.stopPropagation();
                     return;
                 }  
@@ -415,65 +393,44 @@ var masterChartRenderer = function()
                 {
                     self.dragData = null;
                     self.dragRightBorder = false;
-                    self.dragLeftBorder = false;
-                    //event.cancelBubble = false;    
+                    self.dragLeftBorder = false;                 
                     return;
                 }          
             } 
             if(startPoint + self.dragBordersWidth <= x && endPoint - self.dragBordersWidth >= x)
             {
-                document.body.style.cursor = "move";
-                self.dragData =
-                {
-                    x: event.offsetX,
-                    y: event.offsetY,
-                    begTime: begTime,
-                    endTime: endTime
-                };  
+                document.body.style.cursor = "move";               
                 self.dragRightBorder = false;
-                self.dragLeftBorder = false;
-                //event.cancelBubble = true;
-                event.stopPropagation();
+                self.dragLeftBorder = false;  
             } 
             else if(endPoint - self.dragBordersWidth <= x && endPoint + self.dragBordersWidth >= x)
             {
-                document.body.style.cursor = "col-resize";
-                self.dragData =
-                {
-                    x: event.offsetX,
-                    y: event.offsetY,
-                    begTime: begTime,
-                    endTime: endTime
-                };  
+                document.body.style.cursor = "col-resize";               
                 self.dragRightBorder = true;
-                self.dragLeftBorder = false;
-                //event.cancelBubble = true;
-                event.stopPropagation();
-
+                self.dragLeftBorder = false; 
             }
             else if(startPoint - self.dragBordersWidth <= x && startPoint + self.dragBordersWidth >= x)
             {
-                document.body.style.cursor = "col-resize";
-                self.dragData =
-                {
-                    x: event.offsetX,
-                    y: event.offsetY,
-                    begTime: begTime,
-                    endTime: endTime
-                };  
+                document.body.style.cursor = "col-resize";                 
                 self.dragRightBorder = false;
-                self.dragLeftBorder = true;
-                //event.cancelBubble = true;
-                event.stopPropagation();
-
+                self.dragLeftBorder = true;  
             }
             else
             {     
+                document.body.style.cursor = "default"; 
                 self.dragData = null;
                 self.dragRightBorder = false;
-                self.dragLeftBorder = false;
-                //event.cancelBubble = false;    
+                self.dragLeftBorder = false; 
+                return;            
             }
+            self.dragData =
+            {
+                x: event.offsetX,
+                y: event.offsetY,
+                begTime: begTime,
+                endTime: endTime
+            }; 
+            event.stopPropagation();
         }       
 	}
 
@@ -484,89 +441,82 @@ var masterChartRenderer = function()
     {
         var self = this;
         self.detailChart = detailChart;
-    }
+    };
 
     me.drag = function(event)
     {
         var self = this;
         if(self.dragData)
-        {            
-            document.body.style.cursor = "move";
-            //event.cancelBubble = true;
-            event.stopPropagation();
-            var e = event || window.event;            
-
+        {   
+            var e = event || window.event;      
             if (self.previousStateX === null)
             {
                 self.previousStateX = e.clientX;                
             }
             var mapDiffX = e.clientX - self.previousStateX;
-
             var begTime = self.dragData.begTime;
             var endTime = self.dragData.endTime;
-
             var multiplier = (self.chart.xAxis[0].max - self.chart.xAxis[0].min) / self.chart.chartWidth;              
             var btime = begTime + mapDiffX * multiplier;
             var etime = endTime + mapDiffX * multiplier;
-
-            //if(begTime >= self.beginTime && endTime <= self.endTime &&
-            //   btime >= self.beginTime && etime <= self.endTime)
-            //{
-                if(self.dragLeftBorder)
+            if(self.dragLeftBorder)
+            {
+                if(btime < (endTime - multiplier * 30))
                 {
-                    if(btime < (endTime - multiplier * 30))
-                    {
-                        self.changePlotbands(btime, endTime);
-                        self.detailChart.zoomChart(btime / 1000, endTime / 1000, false);
-                    }
-                   
-                } else if(self.dragRightBorder)
+                    self.changePlotbands(btime, endTime);
+                    self.detailChart.zoomChart(btime / 1000, endTime / 1000, false);
+                }               
+            } 
+            else if(self.dragRightBorder)
+            {
+                if((begTime + multiplier * 30) < etime)
                 {
-                    if((begTime + multiplier * 30) < etime)
-                    {
-                        self.changePlotbands(begTime, etime);
-                        self.detailChart.zoomChart(begTime / 1000, etime / 1000, false);
-                    }                
-                }
-                else
-                {   
-                    self.chart.xAxis[0].removePlotBand('plotline');             
-                    self.changePlotbands(btime, etime); 
-                    etime = etime > self.endTime ? self.endTime : etime;
-                    btime = btime < self.beginTime ? self.beginTime : btime;               
-                    self.detailChart.zoomChart(btime / 1000, etime / 1000, false);
-                } 
-            //}    
+                    self.changePlotbands(begTime, etime);
+                    self.detailChart.zoomChart(begTime / 1000, etime / 1000, false);
+                }                
+            }
+            else
+            {   
+                self.chart.xAxis[0].removePlotBand('plotline');             
+                self.changePlotbands(btime, etime); 
+                etime = etime > self.endTime ? self.endTime : etime;
+                btime = btime < self.beginTime ? self.beginTime : btime;               
+                self.detailChart.zoomChart(btime / 1000, etime / 1000, false);
+            } 
+            document.body.style.cursor = "move";           
+            event.stopPropagation();
+          
         }
         else
         {
             if(self.chart !== null)
-            {
-                event.cancelBubble = false;            
+            {                          
                 var x = event.offsetX;
                 var plotBandBefore = self.chart.xAxis[0].plotLinesAndBands[0];
                 var plotBandAfter = self.chart.xAxis[0].plotLinesAndBands[1];  
                 if(typeof plotBandAfter.svgElem !== 'undefined' && typeof plotBandBefore.svgElem !== 'undefined')
                 {
-                    var startPoint = plotBandBefore.svgElem.element.getBBox();
-                    var endPoint = plotBandAfter.svgElem.element.getBBox();             
-                    startPoint = startPoint.x + startPoint.width;
-                    endPoint = endPoint.x;
-                    if(startPoint + self.dragBordersWidth <= x && endPoint - self.dragBordersWidth >= x)
+                    var startPoint = plotBandBefore.svgElem.element.getBBox().x +
+                                     plotBandBefore.svgElem.element.getBBox().width;
+                    var endPoint = plotBandAfter.svgElem.element.getBBox().x;  
+                    if(startPoint + self.dragBordersWidth <= x && 
+                        endPoint - self.dragBordersWidth >= x)
                     {
                         document.body.style.cursor = "move";                   
                     } 
-                    else if(endPoint - self.dragBordersWidth <= x && endPoint + self.dragBordersWidth >= x)
+                    else if(endPoint - self.dragBordersWidth <= x && 
+                            endPoint + self.dragBordersWidth >= x)
                     {
                         document.body.style.cursor = "col-resize"; 
                     }
-                    else if(startPoint - self.dragBordersWidth <= x && startPoint + self.dragBordersWidth >= x)
+                    else if(startPoint - self.dragBordersWidth <= x && 
+                            startPoint + self.dragBordersWidth >= x)
                     {
                         document.body.style.cursor = "col-resize";     
                     }
                     else
                     {     
-                       document.body.style.cursor = "default";   
+                        document.body.style.cursor = "default";   
                     }
                 } 
             }
@@ -574,28 +524,26 @@ var masterChartRenderer = function()
 
     };
 
-    me.stopDrag = function(event)
+    me.stopDrag = function()
     {     
         var self = this;           
         if (self.dragData)
-        {   
-            //event.cancelBubble = true;
-            //event.stopPropagation();
-            self.dragData = null;
-            self.dragLeftBorder = false;
-            self.dragRightBorder = false;
-            self.previousStateX = null;
-            document.body.style.cursor = "default"; 
+        { 
             var btime = self.detailChart.chart.xAxis[0].min / 1000;
             var etime = self.detailChart.chart.xAxis[0].max / 1000;   
             if(!self.detailChart.stopPropagation)         
             {
                 self.detailChart.refreshChart(btime, etime);
-            }                         
+            }   
+            self.dragData = null;
+            self.dragLeftBorder = false;
+            self.dragRightBorder = false;
+            self.previousStateX = null;
+            document.body.style.cursor = "default";                      
         }       
     };
 
-    me.onMouseOut = function(event)
+    me.onMouseOut = function()
     {       
         document.body.style.cursor = "default";
     };
@@ -612,19 +560,14 @@ var masterChartRenderer = function()
         }
     };
 
-    me.bindEvents = function(event)
+    me.bindEvents = function()
     {
         var self = this;
-        mooveContainer = document.getElementById('mooveDiv');
+        var mooveContainer = document.getElementById('mooveDiv');
         mooveContainer.addEventListener('mousedown', self.startDrag.bind(self), true);
         mooveContainer.addEventListener('mousemove', self.drag.bind(self), true);
         mooveContainer.addEventListener('mouseup', self.stopDrag.bind(self), true);
-        mooveContainer.addEventListener('mouseout', self.onMouseOut, true)        
-    };
-
-    me.onSelectionCallback = function(event)
-    {
-        
+        mooveContainer.addEventListener('mouseout', self.onMouseOut, true);       
     };
 
     me.changeSeries = function(series)
@@ -712,7 +655,11 @@ var masterChartRenderer = function()
             var min = self.chart.xAxis[0].min / 1000;
             var max = self.chart.xAxis[0].max / 1000;
             callback(min, max);
-        }, { zIndex: 20}).add();
+        }, 
+        { 
+            zIndex: 20
+        })
+        .add();
     };
 
     me.recalculateDivSizes = function()

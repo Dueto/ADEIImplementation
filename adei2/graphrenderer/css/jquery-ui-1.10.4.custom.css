@@ -44,7 +44,9 @@
 }
 
 
-
+.ui-wp-icon {
+	background image: url("infoicon.png") !important;
+}
 
 .ui-helper-hidden {
 	display: none;

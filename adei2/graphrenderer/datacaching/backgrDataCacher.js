@@ -91,18 +91,19 @@ function onReady()
             onError,
             onReadyTransaction);
 }
-;
+
 
 function requestData(window)
 {
     var time = formatTime(window);
+    var url;
     switch (communicationType)
     {
         case 'websockets':
             socket.sendMessage(tableName + ';' + window + ';' + '1' + ';' + aggregation + ';' + channelCount + ';' + db_items + ';');
             break;
         case 'httpgetcsv':
-            var url = formURLGetCsv(
+            url = formURLGetCsv(
                     db_server,
                     db_name,
                     db_group,
@@ -112,7 +113,7 @@ function requestData(window)
             httpGetCsv(url, onMessageRecievedCsv);
             break;
         case 'httpgetbinary':
-            var url = formURLGetBinary(
+            url = formURLGetBinary(
                     db_server,
                     db_name,
                     db_group,
@@ -135,7 +136,7 @@ function onMessageRecievedCsv(msg)
         data.push([]);
     }
 
-    for (var i = 1; i < rows.length - 1; i++)
+    for (i = 1; i < rows.length - 1; i++)
     {
         var rowdata = rows[i].split(',');
         var time = splitTimeFromAny(rowdata[0]);
@@ -149,7 +150,7 @@ function onMessageRecievedCsv(msg)
 
     onReadyFormingData({data: data, dateTime: dateTime});
 }
-;
+
 
 function onMessageRecievedBinary(msg)
 {
@@ -168,7 +169,7 @@ function onMessageRecievedBinary(msg)
         {
             var time = dataStream.readString(26);
             dateTime.push(formatToUnix(time));
-            for (var i = 0; i < channelCount; i++)
+            for (i = 0; i < channelCount; i++)
             {
                 data[i].push(dataStream.readFloat64(true));
             }
@@ -182,7 +183,7 @@ function onMessageRecievedBinary(msg)
 
     onReadyFormingData({data: data, dateTime: dateTime});
 }
-;
+
 
 
 function onReadyWork()
@@ -194,7 +195,7 @@ function onReadyWork()
     console.log('Background: complete.');
     //self.close();
 }
-;
+
 
 function onErrorWork(err)
 {
@@ -211,7 +212,7 @@ function onReadyTransaction()
     //console.log('Background: transaction completed');
     //self.close();
 }
-;
+
 
 function onError(err)
 {
@@ -222,7 +223,7 @@ function onError(err)
     console.log('Background: ' + err.message);
     //self.close();
 }
-;
+
 
 function onMessageRecieved(msg)
 {
@@ -238,7 +239,7 @@ function onMessageRecieved(msg)
     }
     while (!dataStream.isEof())
     {
-        var time = dataStream.readString(29)
+        var time = dataStream.readString(29);
         dateTime.push(formatToUnix(time));
         for (var i = 0; i < channelCount; i++)
         {
@@ -248,7 +249,7 @@ function onMessageRecieved(msg)
 
     onReadyFormingData({data: data, dateTime: dateTime});
 }
-;
+
 
 function onReadyFormingData(objData)
 {
@@ -262,48 +263,49 @@ function onReadyFormingData(objData)
             onError,
             onReadyWork);
 }
-;
 
-    monthFormats = {
-        'Jan': 0,
-        'Feb': 1,
-        'Mar': 2,
-        'Apr': 3,
-        'May': 4,
-        'Jun': 5,
-        'Jul': 6,
-        'Aug': 7,
-        'Sep': 8,
-        'Oct': 9,
-        'Nov': 10,
-        'Dec': 11
-    };
 
-    function splitTimeFromAny(window)
+monthFormats = 
+{
+    'Jan': 0,
+    'Feb': 1,
+    'Mar': 2,
+    'Apr': 3,
+    'May': 4,
+    'Jun': 5,
+    'Jul': 6,
+    'Aug': 7,
+    'Sep': 8,
+    'Oct': 9,
+    'Nov': 10,
+    'Dec': 11
+}
+
+function splitTimeFromAny(window)
+{
+    var Microsec = window.substr(19);
+    //window = window.substring(0, 18);
+    var year = window.substr(7, 2);
+    var month = window.substr(3, 3);
+    var day = window.substr(0, 2);
+    var hour = window.substr(10, 2);
+    var minute = window.substr(13, 2);
+    var sec = window.substr(16, 2);
+    if (year > 60)
     {
-        var Microsec = window.substr(19);
-        //window = window.substring(0, 18);
-        var year = window.substr(7, 2);
-        var month = window.substr(3, 3);
-        var day = window.substr(0, 2);
-        var hour = window.substr(10, 2);
-        var minute = window.substr(13, 2);
-        var sec = window.substr(16, 2);
-        if (year > 60)
-        {
-            year = '19' + year;
-        }
-        else
-        {
-            year = '20' + year;
-        }
-        var d = new Date(year, monthFormats[month], day, hour, minute, sec);
-        var buf = d.toISOString().substr(13).substring(0, 7);
-        d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
-        var Time = d.toISOString().substring(0, 13);
-        Time = Time + buf + Microsec;
-        return Time;
-    };
+        year = '19' + year;
+    }
+    else
+    {
+        year = '20' + year;
+    }
+    var d = new Date(year, monthFormats[month], day, hour, minute, sec);
+    var buf = d.toISOString().substr(13).substring(0, 7);
+    d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
+    var Time = d.toISOString().substring(0, 13);
+    Time = Time + buf + Microsec;
+    return Time;
+}
 
 function onReadySelectingDataSource(req)
 {
@@ -312,7 +314,7 @@ function onReadySelectingDataSource(req)
     var sqlStatement = 'SELECT DateTime FROM "' + idDataSource + '" WHERE DateTime <=  "' + endTime + '" AND DateTime >= "' + beginTime + '"  ORDER BY DateTime ';
     req.executeSql(sqlStatement, [], onReturnResult);
 }
-;
+
 
 function onReturnResult(req, results)
 {
@@ -323,7 +325,7 @@ function onReturnResult(req, results)
 
         var returnedBeginTime = parseFloat(results.rows.item(0).DateTime);
         var returnedEndTime = parseFloat(results.rows.item(results.rows.length - 1).DateTime);
-
+        var needenTime;
         //console.log(tableName + ';' + '1' + ';' + aggregation + ';' + channelCount + ';' + db_items);
 
         if (beginTime === returnedBeginTime && endTime === returnedEndTime)
@@ -335,21 +337,21 @@ function onReturnResult(req, results)
         if (returnedBeginTime > beginTime && returnedEndTime === endTime)
         {
             //console.log('Background: left - ' + level);
-            var needenTime = beginTime + '-' + returnedBeginTime;
+            needenTime = beginTime + '-' + returnedBeginTime;
             request(needenTime);
             return;
         }
         if (returnedBeginTime === beginTime && returnedEndTime < endTime)
         {
             //console.log('Background: right - ' + level);
-            var needenTime = returnedEndTime + '-' + endTime;
+            needenTime = returnedEndTime + '-' + endTime;
             request(needenTime);
             return;
         }
         if (beginTime < returnedBeginTime && endTime > returnedEndTime)
         {
             //console.log('Background: everithing - ' + level);
-            var needenTime = beginTime + '-' + endTime;
+            needenTime = beginTime + '-' + endTime;
             request(needenTime);
             return;
         }
@@ -365,14 +367,14 @@ function onReturnResult(req, results)
         request(window);
     }
 }
-;
+
 
 function formatUnixTime(time, aggregator)
 {
-    if (aggregator != 0)
+    if (aggregator !== 0)
     {
         var multiplier = time / aggregator;
-        multiplier = parseInt(multiplier);
+        multiplier = parseInt(multiplier, 10);
         multiplier = multiplier * aggregator;
         return multiplier;
     }
@@ -382,7 +384,7 @@ function formatUnixTime(time, aggregator)
     }
 
 }
-;
+
 
 function request(needenTime)
 {
@@ -401,7 +403,7 @@ function request(needenTime)
         requestData(time);
     }
 }
-;
+
 
 function formValues(data, i)
 {
@@ -414,7 +416,7 @@ function formValues(data, i)
     }
     return ', "' + JSON.stringify(points) + '"';
 }
-;
+
 
 function formatToUnix(time)
 {
@@ -423,7 +425,7 @@ function formatToUnix(time)
     var unix = (Date.parse(date) / 1000) + '.' + milisec;
     return unix;
 }
-;
+
 
 
 function httpGetCsv(url, callback)
@@ -441,7 +443,7 @@ function httpGetCsv(url, callback)
     xmlHttp.open("GET", url, true);
     xmlHttp.send(null);
 }
-;
+
 
 function httpGetBinary(url, callback)
 {
@@ -456,7 +458,7 @@ function httpGetBinary(url, callback)
     xmlHttp.responseType = "arraybuffer";
     xmlHttp.send(null);
 }
-;
+
 
 function formatTime(window)
 {
@@ -472,7 +474,7 @@ function formatTime(window)
     }
     return {begTime: beginTime, endTime: endTime};
 }
-;
+
 
 function formURLGetCsv(db_server, db_name, db_group, db_mask, window, level)
 {
@@ -486,7 +488,7 @@ function formURLGetCsv(db_server, db_name, db_group, db_mask, window, level)
             + '&format=csv';
     return url;
 }
-;
+
 
 function formURLGetBinary(db_server, db_name, db_group, db_mask, window, level)
 {
@@ -500,6 +502,6 @@ function formURLGetBinary(db_server, db_name, db_group, db_mask, window, level)
             + '&format=binary';
     return url;
 }
-;
+
 
 

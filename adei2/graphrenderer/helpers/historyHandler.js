@@ -9,7 +9,7 @@ var historyHandler = function()
 	me.addWindow = function(beginTime, endTime)
 	{
 		var self = this;	
-		self.currentWindow++;	
+		self.currentWindow++;	 
 		if(self.currentWindow === self.history.length)
 		{			
 			self.history.push({beginTime: beginTime, endTime: endTime});						
@@ -36,7 +36,7 @@ var historyHandler = function()
 	me.getNextWindow = function()
 	{
 		var self = this;
-		if(self.currentWindow + 1 < self.history.length)
+		if(self.currentWindow + 1 <= self.history.length)
 		{
 			self.currentWindow++;
 			return self.history[self.currentWindow];
@@ -50,7 +50,7 @@ var historyHandler = function()
 	me.getPrevWindow = function()
 	{
 		var self = this;
-		if(self.currentWindow - 1 > 0)
+		if(self.currentWindow - 1 >= 0)
 		{
 			self.currentWindow--;
 			return self.history[self.currentWindow];

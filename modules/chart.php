@@ -5,8 +5,11 @@ $chart_title = _("Chart");
 function chartJS() {
 ?>      
 
-   chart = new detailChartRenderer();
-  
+  chart = new detailChartRenderer('moduleChart');
+  //chart.addButton('ui-icon-arrowthickstop-1-s', data_export.Export.bind(data_export));  
+  chart.addButton('ui-icon-info', infotab.onSelect.bind(infotab));
+  chart.addCallbackOnChartRefreshing(source_window.SetCustomWindow.bind(source_window)); 
+
 <?
    
     return "chart";
@@ -25,13 +28,8 @@ function chartPage() {
   </div>/!-->
 
 <div id="moduleChart">
-     <div id="mooveDiv">   	
-     	<div id="masterChart" style="height: 150px;" style: "flow: auto"> 
-     	</div>   
-   	</div>
-        <div id="detailChart" style: "position:absolute;"> 
-         </div>   
-         <div> 
+ 
+<div> 
 
 
 

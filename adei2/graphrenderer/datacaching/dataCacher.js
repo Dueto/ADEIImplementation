@@ -11,7 +11,7 @@ var dataCacher = function(communicationType, isCache, isCacheDown, isCacheUp, is
     me.isCacheCurrent = isCacheCurrent;
 
     //me.hostURL = 'http://ipecluster5.ipe.kit.edu/ADEIRelease/adei';
-    me.HostURL = '././.'
+    me.HostURL = '././.';
 
     me.db = '';
     me.clientsCallback = '';
@@ -30,6 +30,7 @@ var dataCacher = function(communicationType, isCache, isCacheDown, isCacheUp, is
         me.isCacheUp = false;
         me.isCacheCurrent = false;
     }
+
     me.getData = function(db_server,
             db_name,            
             db_group,
@@ -42,7 +43,7 @@ var dataCacher = function(communicationType, isCache, isCacheDown, isCacheUp, is
         var self = this;
         var db_items = db_mask.split(',');
         db_items.sort();
-        self.dataHandl.deleteWorkers();
+        //self.dataHandl.deleteWorkers();
         self.clientsCallback = onEndCallBack;
         self.aggregation = aggregation;
         if (self.dataHandl.isPriviousRequest(db_server, db_name, db_group, aggregation, db_items))
@@ -70,7 +71,7 @@ var dataCacher = function(communicationType, isCache, isCacheDown, isCacheUp, is
                     var sql = 'SELECT * FROM DataSource WHERE ((db_server="' + db_server + '") AND (db_name="' + db_name + '")) AND ((db_group="' + db_group + '") AND (aggregation="' + aggregation + '")) AND (db_items="' + db_items + '")';
                     req.executeSql(sql, [], function(req, results)
                     {
-                        if (results.rows.length == 0)
+                        if (results.rows.length === 0)
                         {
                             if (db_mask != 'all')
                             {
@@ -144,27 +145,6 @@ var dataCacher = function(communicationType, isCache, isCacheDown, isCacheUp, is
                 self.onReadyFormingRequest();
             }
         }
-
-
-        /*self.formDbMask(db_server, db_name, db_group);
-         if (db_mask != 'all')
-         {
-         var db_items = db_mask.split(',');
-         }
-         var maxLevel = self.formMaxLevel(db_server, db_name, db_group);
-         var dataLevels = self.formDataLevels(db_server, db_name, db_group);
-
-         self.dataHandl.setChannelCount(self.db_mask.length);
-         self.dataHandl.setMaxLevel(maxLevel);
-         self.dataHandl.setDataLevels(dataLevels);
-         self.dataHandl.setRequest(db_server, db_name, db_group, db_items, window, pointCount);
-
-         self.level = self.dataHandl.level;
-         self.tableName = self.formTableName(self.level.window);
-         self.columns = self.formTableColumns();
-         self.clientsCallback = onEndCallBack;*/
-
-
     };
 
     me.onReadyFormingRequest = function()
@@ -179,7 +159,7 @@ var dataCacher = function(communicationType, isCache, isCacheDown, isCacheUp, is
                 req.executeSql(sqlStatement, [], function(req, results)
                 {
 
-                    if (results.rows.length == 0)
+                    if (results.rows.length === 0)
                     {
                         self.requestData(self.dataHandl.getWindow());
                     }
@@ -189,13 +169,9 @@ var dataCacher = function(communicationType, isCache, isCacheDown, isCacheUp, is
                         var time = self.dateHelper.formatTime(self.dataHandl.getWindow());
                         var sqlStatement = 'SELECT * FROM "' + idDataSource + '" WHERE  (DateTime) <=  ' + parseInt(time.endTime) + ' AND (DateTime) >= ' + parseInt(time.begTime) + ' ORDER BY DateTime';
                         req.executeSql(sqlStatement, [], self.onReturnResult.bind(self));
-
                     }
-
-
                 },
                         self.onErrorSql.bind(self));
-
             },
                     self.onError.bind(self),
                     self.onReadyTransaction);
@@ -345,7 +321,7 @@ var dataCacher = function(communicationType, isCache, isCacheDown, isCacheUp, is
             else
             {
                 self.clientsCallback(objData);
-                console.log('Too much points in request.')
+                console.log('Too much points in request.');
             }
         }
         else
@@ -383,7 +359,7 @@ var dataCacher = function(communicationType, isCache, isCacheDown, isCacheUp, is
         this.db.transaction(function(req)
         {
             req.executeSql('CREATE TABLE IF NOT EXISTS DataSource (id INTEGER PRIMARY KEY AUTOINCREMENT,db_server,db_name,db_group, aggregation, level, db_items, labels, datalevels)', [],
-                    function(res, rows) {
+                    function() {
                     });
         },
                 this.onError.bind(this),
@@ -401,7 +377,7 @@ var dataCacher = function(communicationType, isCache, isCacheDown, isCacheUp, is
         this.openDataBase('DB');
     };
 
-    me.onErrorSql = function(asd, err)
+    me.onErrorSql = function(form, err)
     {
         alert('Error in caching module: ' + err.message + '\n\n\n To solve this problem, try to clear your cache in browser.');
         this.openDataBase('DB');
@@ -519,9 +495,7 @@ var dataCacher = function(communicationType, isCache, isCacheDown, isCacheUp, is
     };
 
     me.formTableColumns = function()
-    {
-        var self = this;
-        var db_mask = self.dataHandl.getDbMask();
+    {            
         var columns = ', PointsData';
         /*for (var i = 0; i < db_mask.length; i++)
         {
