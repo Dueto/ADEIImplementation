@@ -125,6 +125,22 @@ var dateTimeFormat = function()
 
     };
 
+
+    me.formatUnixTime = function(time, aggregator)
+    {
+        if (parseInt(aggregator, 10) !== 0)
+        {
+            var multiplier = time / aggregator;
+            multiplier = parseInt(multiplier, 10);
+            multiplier = multiplier * aggregator;
+            return multiplier;
+        }
+        else
+        {
+            return time;
+        }
+    }
+
     return me;
 
 };

@@ -133,20 +133,21 @@ var masterChartRenderer = function()
                                 gridLineWidth: 0,
                                 labels:
                                         {
-                                            enabled: false
+                                            enabled: true
                                         },
                                 title:
                                         {
                                             text: null
                                         },
-                                showFirstLabel: false
+                                showFirstLabel: true,
+                                tickPixelInterval: 12
                             },
                     xAxis:
                             {
                                 type: 'datetime'
                             },
                     tooltip:
-                            {
+                            { 
                                 formatter: function()
                                 {
                                     return false;
@@ -185,7 +186,7 @@ var masterChartRenderer = function()
                                         }
                             },
                     series: [series],
-                     exporting: 
+                    exporting: 
                     {
                         buttons: 
                         {                    
@@ -261,8 +262,8 @@ var masterChartRenderer = function()
         self.leftControl.appendChild(leftIcon);
         self.leftControl.style.display = true;
         self.leftControl.style.marginTop = 10;
-        self.leftControl.style.left = pos.left + 15 +'px';
-        self.leftControl.style.top = chart.y + 30 + 'px';
+        self.leftControl.style.left = pos.left + 12 +'px';
+        self.leftControl.style.top = pos.top + 25 + 'px';
         self.leftControl.style.marginTop = '40px';
         self.leftControl.style.height = '40px';
         self.leftControl.onmousedown = self.dragLeftSide.bind(self);        
@@ -284,8 +285,8 @@ var masterChartRenderer = function()
         if(typeof width !== 'undefined')  
         {self.rightControl.style.left = pos.left + width - 38 + 'px';}
         else
-        {self.rightControl.style.left = pos.left + chart.width + 65 + 'px';}           
-        self.rightControl.style.top = chart.y + 30 +'px';
+        {self.rightControl.style.left = pos.left + chart.width + 70 + 'px';}           
+        self.rightControl.style.top = pos.top + 25 +'px';
         self.rightControl.style.marginTop = '40px';
         self.rightControl.style.height = '40px';
         self.rightControl.onmousedown = self.dragRightSide.bind(self);

@@ -13,6 +13,10 @@ var dataCacher = function(communicationType, isCache, isCacheDown, isCacheUp, is
     //me.hostURL = 'http://ipecluster5.ipe.kit.edu/ADEIRelease/adei';
     me.HostURL = '././.';
 
+    me.partialData = null;
+    me.isFullInterval = false;
+    me.isRightIntervalRequested = false;
+
     me.db = '';
     me.clientsCallback = '';
     me.level = '';
@@ -166,8 +170,8 @@ var dataCacher = function(communicationType, isCache, isCacheDown, isCacheUp, is
                     else
                     {
                         var idDataSource = results.rows.item(0).id;
-                        var time = self.dateHelper.formatTime(self.dataHandl.getWindow());
-                        var sqlStatement = 'SELECT * FROM "' + idDataSource + '" WHERE  (DateTime) <=  ' + parseInt(time.endTime) + ' AND (DateTime) >= ' + parseInt(time.begTime) + ' ORDER BY DateTime';
+                        var time = self.dateHelper.formatTime(self.dataHandl.getWindow());                        
+                        var sqlStatement = 'SELECT * FROM "' + idDataSource + '" WHERE  (DateTime) <=  ' + parseFloat(time.endTime, 10) + ' AND (DateTime) >= ' + parseFloat(time.begTime, 10) + ' ORDER BY DateTime';
                         req.executeSql(sqlStatement, [], self.onReturnResult.bind(self));
                     }
                 },
@@ -228,25 +232,71 @@ var dataCacher = function(communicationType, isCache, isCacheDown, isCacheUp, is
             {
                 var dataBuffer = [];
                 var dateTime = [];
-                var labels = [];
+                var labels = [];                
                 self.dataHandl.concatRowData(res, dataBuffer, dateTime);
                 labels = self.dataHandl.getLabels();
-
-                if (self.isCache)
+                var needenInterval = self.checkInterval(res);
+                if(needenInterval)
                 {
-                    self.startBackgroundCachers();
+                    self.partialData = {data: dataBuffer, dateTime: dateTime, label: labels};
+                    self.insertNeedenDataBckgr(needenInterval);
                 }
-                self.clientsCallback({data: dataBuffer, dateTime: dateTime, label: labels});
+                else
+                {              
+                    if (self.isCache)
+                    {
+                        self.startBackgroundCachers();
+                    }
+                    self.clientsCallback({data: dataBuffer, dateTime: dateTime, label: labels});
+                }                
             }
 
             else
             {
+                self.partialData = null;
                 self.insertNeedenDataBckgr(self.dataHandl.getWindow());
             }
         }
         else
         {
         }
+    };
+
+    me.checkInterval = function(res)
+    {
+        var self = this;
+        var level = self.level.window;
+        if(parseInt(self.level.window, 10) === 0)
+        {
+            level = parseFloat(res.rows.item(1).DateTime, 10) - parseFloat(res.rows.item(0).DateTime, 10);
+        }
+        var beginTime = parseFloat(self.dateHelper.formatUnixTime(self.dataHandl.getWindow().split('-')[0], level)) + 50 * level;
+        var endTime = parseFloat(self.dateHelper.formatUnixTime(self.dataHandl.getWindow().split('-')[1], level)) - 50 * level;
+
+        var returnedBeginTime = parseFloat(res.rows.item(0).DateTime);
+        var returnedEndTime = parseFloat(res.rows.item(res.rows.length - 1).DateTime);
+        var needenTime;   
+        
+        if(beginTime >= returnedBeginTime && endTime <= returnedEndTime)
+        {
+            return false;
+        }
+        if (returnedBeginTime > beginTime && returnedEndTime >= endTime)
+        {            
+            self.isRightIntervalRequested = false;
+            needenTime = beginTime + '-' + returnedBeginTime; 
+        }
+        if (returnedBeginTime <= beginTime && returnedEndTime < endTime)
+        {            
+            self.isRightIntervalRequested = true;
+            needenTime = returnedEndTime + '-' + endTime;   
+        }
+        if (beginTime < returnedBeginTime && endTime > returnedEndTime)
+        {           
+            self.isFullInterval = true;            
+            needenTime = beginTime + '-' + endTime;      
+        }
+        return needenTime;
     };
 
     me.startBackgroundCachers = function()
@@ -305,17 +355,29 @@ var dataCacher = function(communicationType, isCache, isCacheDown, isCacheUp, is
         var self = this;
         if (objData.dateTime.length != 0)
         {
+            if(self.partialData !== null && !self.isFullInterval)
+            {
+                if(self.isRightIntervalRequested)
+                {
+                    objData = self.dataHandl.concatPartialData(objData, self.partialData);
+                }
+                else
+                {
+                    objData = self.dataHandl.concatPartialData(self.partialData, objData);
+                }                
+                self.partialData = null;
+            }
+            self.isFullInterval = false;
             if (objData.data[0].length < 10000)
             {
                 if (!self.isFirefox)
                 {
                     if (self.isCache)
                     {
-
                         self.dataHandl.startBackgroundCaching(self.level, self.columns, self.tableName);
                         self.startBackgroundCachers();
                     }
-                }
+                }                
                 self.clientsCallback(objData);
             }
             else
@@ -326,6 +388,12 @@ var dataCacher = function(communicationType, isCache, isCacheDown, isCacheUp, is
         }
         else
         {
+            if(self.partialData !== null)
+            {
+                self.clientsCallback(self.partialData);
+                self.partialData = null;
+                return;
+            }
             self.clientsCallback(null);
             throw 'There is no data in server responces.';
         }
@@ -450,7 +518,7 @@ var dataCacher = function(communicationType, isCache, isCacheDown, isCacheUp, is
         var self = this;
         var url = self.formURLInfo(db_server, db_name, db_group, 'cache');
         var responseXML = self.httpGetXml(url);
-        var item = responseXML.getElementsByTagName('Value');
+        var item = responseXML ? responseXML.getElementsByTagName('Value') : [];
         var dataLevels = item[0].getAttribute('resolutions').split(',');
 
         return dataLevels;
@@ -461,7 +529,7 @@ var dataCacher = function(communicationType, isCache, isCacheDown, isCacheUp, is
         var self = this;
         var url = self.formURLList(db_server, db_name, db_group, 'items');
         var responseXML = self.httpGetXml(url);
-        var items = responseXML.getElementsByTagName('Value');
+        var items = responseXML ? responseXML.getElementsByTagName('Value') : [];
         var db_mask = [];
         for (var i = 0; i < items.length; i++)
         {
@@ -509,7 +577,7 @@ var dataCacher = function(communicationType, isCache, isCacheDown, isCacheUp, is
         var self = this;
         var url = self.formURLLabel(self.dataHandl.getDbServer(), self.dataHandl.getDbName(), self.dataHandl.getDbGroup(), self.dataHandl.getDbMask(), 'items');
         var responseXML = self.httpGetXml(url);
-        var items = responseXML.getElementsByTagName('Value');
+        var items = responseXML ? responseXML.getElementsByTagName('Value') : [];
         var labels = [];
 
         for (var i = 0; i < items.length; i++)
@@ -527,6 +595,12 @@ var dataCacher = function(communicationType, isCache, isCacheDown, isCacheUp, is
             values = values + ',' + data[j][i];
         }
         return values;
+    };
+
+    me.deleteWorkers = function()
+    {
+        var self = this;
+        self.dataHandl.deleteWorkers();
     };
 
     me.httpGetXml = function(url)

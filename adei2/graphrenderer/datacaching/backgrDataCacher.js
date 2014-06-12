@@ -167,8 +167,9 @@ function onMessageRecievedBinary(msg)
     {
         while (!dataStream.isEof())
         {
-            var time = dataStream.readString(26);
-            dateTime.push(formatToUnix(time));
+            var time = dataStream.readUint32(true);
+            time = time + parseFloat('0.' + dataStream.readUint32(true));
+            dateTime.push(time);
             for (i = 0; i < channelCount; i++)
             {
                 data[i].push(dataStream.readFloat64(true));
@@ -320,8 +321,8 @@ function onReturnResult(req, results)
 {
     if (results.rows.length !== 0)
     {
-        var beginTime = parseFloat(formatUnixTime(window.split('-')[0], level)) + 2 * level;
-        var endTime = parseFloat(formatUnixTime(window.split('-')[1], level)) - 2 * level;
+        var beginTime = parseFloat(formatUnixTime(window.split('-')[0], level));// + 2 * level;
+        var endTime = parseFloat(formatUnixTime(window.split('-')[1], level));// - 2 * level;
 
         var returnedBeginTime = parseFloat(results.rows.item(0).DateTime);
         var returnedEndTime = parseFloat(results.rows.item(results.rows.length - 1).DateTime);

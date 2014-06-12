@@ -22,9 +22,9 @@ class BINARYHandler extends DATAHandler
     if ($this->subseconds) {
 
         $subsec = strchr(sprintf("%.6F", $time), '.');
-        $this->h->Write(pack("a*", date('Y-m-d H:i:s', $time) . $subsec));
+        $this->h->Write(pack('I*', $time) . pack('I*', $subsec));
     } else  {
-        $this->h->Write(pack("a*", date('Y-m-d H:i:s', $time) . ".000000"));
+        $this->h->Write(pack('I*', $time) . pack('I*', 0));
     }
 
     foreach ($values as $value) {

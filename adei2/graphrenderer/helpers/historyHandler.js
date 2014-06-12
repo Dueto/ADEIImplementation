@@ -12,13 +12,15 @@ var historyHandler = function()
 		self.currentWindow++;	 
 		if(self.currentWindow === self.history.length)
 		{			
-			self.history.push({beginTime: beginTime, endTime: endTime});						
+			self.history.push({beginTime: beginTime, endTime: endTime});
+			window.history.pushState({beginTime: beginTime, endTime: endTime});						
 		}
 		else
 		{		
 			var historyToDelete = self.history.length - self.currentWindow;
 			self.history.splice(self.currentWindow, historyToDelete);
 			self.history.push({beginTime: beginTime, endTime: endTime});	
+			window.history.pushState({beginTime: beginTime, endTime: endTime});
 		}
 		if(self.history.length > 30)
 		{

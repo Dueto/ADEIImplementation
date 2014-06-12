@@ -170,6 +170,16 @@ var dataHandler = function(communicationType)
         }
     };
 
+    me.concatPartialData = function(objFrom, objTo)
+    {
+        objTo.dateTime = objTo.dateTime.concat(objFrom.dateTime);
+        for(var i = 0; i < objTo.data.length; i++)
+        {
+            objTo.data[i] = objTo.data[i].concat(objFrom.data[i]);
+        }
+        return objTo;
+    };
+
     me.getDataLevel = function(pointCount, window)
     {
         var diffrence = window.split('-')[1] - window.split('-')[0];
@@ -399,7 +409,7 @@ var dataHandler = function(communicationType)
     {
         var dataStream = new DataStream(msg);
         dataStream.readString(1);
-        dataStream.endianness = dataStream.BIG_ENDIAN;
+        dataStream.endianness = dataStream.LITTLE_ENDIAN;
         var dateTime = [];
         var data = [];
         for (var i = 0; i < this.db_mask.length; i++)
@@ -410,8 +420,9 @@ var dataHandler = function(communicationType)
         {
             while (!dataStream.isEof())
             {
-                var time = dataStream.readString(26);
-                dateTime.push(this.formatToUnix(time));
+                var time = dataStream.readUint32(true);
+                time = time + parseFloat('0.' + dataStream.readUint32(true));
+                dateTime.push((time));
                 for (var i = 0; i < this.db_mask.length; i++)
                 {
                     data[i].push(dataStream.readFloat64(true));
