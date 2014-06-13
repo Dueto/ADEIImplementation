@@ -189,7 +189,7 @@ var detailChartRenderer = function(containerId)
             self.addStateInHistory(self.initialBeginTime, self.initialEndTime);
             self.formAxesInfo(dataSource);
             self.dataSources.push(dataSource);
-            self.renderChart(experiment);      
+            self.renderChart(experiment);  
         }   
     };
 
@@ -244,7 +244,7 @@ var detailChartRenderer = function(containerId)
                                 var minWindow = parseInt(self.needenWindow.split('-')[0], 10) * 1000;
                                 var maxWindow = parseInt(self.needenWindow.split('-')[1], 10) * 1000;
                                 if(minWindow >= min && maxWindow <= max && minWindow < maxWindow)
-                                {
+                                { 
                                     min = minWindow;
                                     max = maxWindow;
                                 }
@@ -264,6 +264,7 @@ var detailChartRenderer = function(containerId)
                     }
                     self.rebuildAxesControls();
                     self.setChartTitle();
+                    self.setUpMetadataInMasterChart();
 
                 });
             
@@ -783,7 +784,8 @@ var detailChartRenderer = function(containerId)
         self.chart.redraw();              
         if(self.firstRequest === true)
         {  
-            self.setXAxisWithNeedenWindow();      
+            self.setXAxisWithNeedenWindow();   
+            self.setUpMetadataInMasterChart();   
             self.refreshMasterChart(self.chart.xAxis[0].min, self.chart.xAxis[0].max);                     
             self.firstRequest = false;               
         }        
@@ -1446,7 +1448,7 @@ var detailChartRenderer = function(containerId)
                     { 
                         return function(e)
                         {    
-                           // window.event.cancelBubble = true;
+                            window.event.cancelBubble = true;
                             //window.event.stopPropagation();
                             if (isDragging) 
                             {                           
@@ -1543,6 +1545,21 @@ var detailChartRenderer = function(containerId)
                         yAxis.options.tickInterval = undefined;
                         self.delta = 0;                                       
                     }, 200);                    
+                };
+            }(yAxis, rect);
+
+            rectangles[i].ondblclick = function(yAxis, rect)
+            { 
+                return function(e)
+                {  
+                    var max = yAxis.getExtremes().dataMax;
+                    var min = yAxis.getExtremes().dataMin;
+                    var margin = (max - min) / 10;
+                    yAxis.options.startOnTick = false;
+                    yAxis.options.endOnTick = false;
+                    yAxis.tickInterval = undefined;
+                    yAxis.options.tickInterval = undefined;                    
+                    yAxis.setExtremes(min - margin, max + margin);    
                 };
             }(yAxis, rect);
 
@@ -1977,19 +1994,89 @@ var detailChartRenderer = function(containerId)
                 + '&info=1';
         return url;
     };
+
+    me.formURLMetadata = function(db_server, db_name, db_group, db_channels, experiment, resolution, target)
+    {
+        var url = this.hostURL + '/services/cache.php?db_server=' + db_server
+                + '&db_name=' + db_name
+                + '&db_group=' + db_group
+                + '&db_mask=' + db_channels
+                + '&target=' + target
+                + '&experiment=' + experiment
+                + '&resolution=' + resolution
+        return url;
+    };
     
     me.httpGetText = function(url)
     {
-	var xmlHttp = null;
-	
-	xmlHttp = new XMLHttpRequest();
-	xmlHttp.open("GET", url, false);
-	xmlHttp.send(null);
-	return xmlHttp.response;
+    	var xmlHttp = null;	
+    	xmlHttp = new XMLHttpRequest();
+    	xmlHttp.open("GET", url, false);
+    	xmlHttp.send(null);
+    	return xmlHttp.response;
     };
 
-   me.stringtoXML = function(text)
-   {
+    me.setUpMetadataInMasterChart = function()
+    {
+        var self = this;
+        var res = self.db.level.window;
+        var urlMissingPoints = self.formURLMetadata(self.dataSources[0].db_server, self.dataSources[0].db_name,
+                                self.dataSources[0].db_group, self.dataSources[0].channels, 
+                                self.initialBeginTime + '-' + self.initialEndTime, res,
+                                'missing_points');
+
+        var urlPointCount = self.formURLMetadata(self.dataSources[0].db_server, self.dataSources[0].db_name,
+                                self.dataSources[0].db_group, self.dataSources[0].channels, 
+                                self.initialBeginTime + '-' + self.initialEndTime, res,
+                                'point_count');
+        var csvMissingPoints = self.httpGetText(urlMissingPoints);
+        var csvPointCount = self.httpGetText(urlPointCount);
+        self.masterChart.setSeriesMissingPoints(self.parseCsv(csvMissingPoints));
+        self.masterChart.setSeriesPointCount(self.parseCsv(csvPointCount));
+    };
+
+
+    me.renderMissingPoints = function()
+    {
+        var self =  this;
+        self.masterChart.renderMissingPoints();
+        self.setChartTitle();
+    };
+
+    me.renderPointCounts = function()
+    {
+        var self =  this;
+        self.masterChart.renderPointCounts();
+        self.setChartTitle();
+    };
+
+    me.renderFirstSeries = function()
+    {
+        var self = this;
+        self.masterChart.renderData();
+        self.setChartTitle();
+    };
+
+    me.parseCsv = function(msg)
+    {
+        var self = this;
+        var rows = msg.split(self.db.dataHandl.lineSeparator);
+        var channelCount = rows[0].split(',');   
+        var series = {data: [], name: ''}; 
+        series.name = rows[0].split(',')[1];       
+        for (var i = 1; i < rows.length - 1; i++)
+        {
+            var rowdata = rows[i].split(',');
+            var time = rowdata[0]; 
+            var value = rowdata[1];
+            series.data.push([parseFloat(time * 1000, 10), parseFloat(value, 10)]);           
+        }    
+        return series;           
+    };
+
+
+    me.stringtoXML = function(text)
+    {
         var doc;
         if (window.ActiveXObject)
         {
@@ -2420,10 +2507,10 @@ var detailChartRenderer = function(containerId)
         mooveAxesDiv.appendChild(detailChart);        
     };
 
-    me.export = function()
+    /*me.export = function()
     {
         data_export.Export(true);
-    };
+    };*/
 
     me.GetNode = function(){};
     me.attachEvent = function(){};
@@ -2452,12 +2539,19 @@ var detailChartRenderer = function(containerId)
                         separator: true
                     },                    
                     {
-                        onclick: me.changeZoomTypeToMap.bind(me),
+                        onclick: me.renderMissingPoints.bind(me),
                         text: 'Show missing points' 
                     },
                     {
-                        onclick: me.changeZoomTypeToXY.bind(me),
-                        text: 'Show point count on in requested experiment interval'
+                        onclick: me.renderPointCounts.bind(me),
+                        text: 'Show point count on experiment interval'
+                    },
+                    {
+                        onclick: me.renderFirstSeries.bind(me),
+                        text: 'Show first channel'
+                    },
+                    {
+                        separator: true
                     }];
 
     me.buttons = [{
@@ -2465,13 +2559,13 @@ var detailChartRenderer = function(containerId)
                     text: false,
                     icons: {primary: 'ui-icon ui-icon-arrowreturnthick-1-s'},
                     onclick: me.onZoomEvent.bind(me)
-                },
+                }/*,
                 {
                     label: false,
                     text: false,
                     icons: {primary: 'ui-icon-arrowthickstop-1-s'},
                     onclick: me.export, 
-                }];
+                }*/];
 
     me.createDivs();
     me.axes = me.getAllAxes();

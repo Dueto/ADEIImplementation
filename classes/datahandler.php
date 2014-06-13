@@ -120,5 +120,4 @@ abstract class DATAHandler implements DATAHandlerInterface {
 }
 
 require("handlers/csv.php");
-require("handlers/binary.php");
 ?>

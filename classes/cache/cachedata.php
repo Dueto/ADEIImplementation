@@ -5,6 +5,7 @@ class CACHEData implements Iterator {
 
  var $res;
  var $key, $row;
+ var $row_assoc;
  
 
  function __construct(CACHEDB $cache, $table, $from, $to) {
@@ -24,6 +25,8 @@ class CACHEData implements Iterator {
 	throw new ADEIException(translate("Select request to CACHE is failed [%s]", $this->query));
     $this->next();
  }
+
+
  
  function current() {
     return $this->row;
@@ -45,5 +48,37 @@ class CACHEData implements Iterator {
  function valid() {
     return $this->row?true:false;
  }
+
+ function rewindAssoc()
+ {
+    $this->res = mysql_query($this->query, $this->cache->dbh);
+    if (!$this->res)
+    throw new ADEIException(translate("Select request to CACHE is failed [%s]", $this->query));
+    $this->nextAssoc();
+ }
+
+function currentAssoc() {
+    return $this->row_assoc;
+ }
+
+ function nextAssoc()
+ {
+    $this->row_assoc = mysql_fetch_assoc($this->res);
+    if ($this->row_assoc) $this->key = strtotime($this->row_assoc['time']);
+    else {
+    $this->key = false;
+    mysql_free_result($this->res);
+    }
+ }
+
+ function validAssoc()
+ {
+    return $this->row_assoc?true:false;
+ }
+
+ 
+
+
+
 }
 ?>

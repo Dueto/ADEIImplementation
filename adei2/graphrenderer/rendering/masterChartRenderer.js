@@ -8,6 +8,7 @@ var masterChartRenderer = function()
     me.zoomCallback = '';
     me.chart = null;
     me.series = [];
+    me.seriesData = [];
     me.optimalSeries = [];
     me.seriesNumber = 0;
     me.dragData = null;
@@ -37,14 +38,15 @@ var masterChartRenderer = function()
 
     me.controlsVisibility = 'none';
 
+    me.seriesMissingPoints = null;
+    me.seriesPointCount = null;
 
     me.renderMasterChar = function(id, series, seriesNumber)
     {
         var self = this;      
         self.id = id;
         var ser = {};
-        ser.data = [];   
-        self.title = series.name;
+        ser.data = [];           
         self.seriesNumber = seriesNumber;     
         for (var i = 0; i < series.data.length; i++)
         {
@@ -55,6 +57,7 @@ var masterChartRenderer = function()
         ser.name = series.name;
         ser.pointInterval = series.pointInterval;
         self.series.push(ser);
+        self.seriesData = ser;
 
         jQuery('#' + id).highcharts(
                 {
@@ -140,7 +143,8 @@ var masterChartRenderer = function()
                                             text: null
                                         },
                                 showFirstLabel: true,
-                                tickPixelInterval: 12
+                                tickPixelInterval: 12,
+                                opposite: true
                             },
                     xAxis:
                             {
@@ -242,7 +246,7 @@ var masterChartRenderer = function()
     me.setTitle = function(dataSourceTitle)
     {
         var self = this;
-        self.chart.setTitle({ text: self.title + ' - ' + dataSourceTitle});
+        self.chart.setTitle({ text: self.series[0].name + ' - ' + dataSourceTitle});
     };
 
     me.buildControls = function(width)
@@ -575,7 +579,8 @@ var masterChartRenderer = function()
     {
         this.series = [];
         this.series.push(series);
-        this.chart.setData(this.series);
+        this.chart.series[0].remove();
+        this.chart.addSeries(series);
     };
 
     me.changePlotbands = function(beginTime, endTime)
@@ -667,6 +672,39 @@ var masterChartRenderer = function()
     {
         var self = this;
         self.divWidth = document.getElementsByClassName('highcharts-series-group')[1].getBBox().width;
+    };
+
+    me.setSeriesMissingPoints = function(series)
+    {
+        var self = this; 
+        self.seriesMissingPoints = series;
+    };
+
+    me.setSeriesPointCount = function(series)
+    {
+        var self = this; 
+        self.seriesPointCount = series;
+    };
+
+    me.renderMissingPoints = function()
+    {
+        var self = this;
+        self.seriesMissingPoints.color = "#f15c80";
+        self.changeSeries(self.seriesMissingPoints);
+    };
+
+    me.renderPointCounts = function()
+    {
+        var self = this;
+        self.seriesPointCount.color = "#90ed7d";
+        self.changeSeries(self.seriesPointCount);
+    };
+
+    me.renderData = function()
+    {
+        var self = this; 
+        self.seriesData.color = "#7cb5ec";       
+        self.changeSeries(self.seriesData);
     };
 
     return me;

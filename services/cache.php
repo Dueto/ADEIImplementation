@@ -14,16 +14,16 @@ try
 	$from = explode('-', $experiment)[0];
 	$to = explode('-', $experiment)[1];
 	$cache_data = new CACHEData($cachedb, $table, $from, $to);		
-	$cache_data->rewind();
+	$cache_data->rewindAssoc();
     switch($_GET['target']) 
     {
 		case 'point_count':		   
 		    $response = "Date/Time, Point count\r\n";
-			while($cache_data->valid())
+			while($cache_data->validAssoc())
 			{
-				$row = $cache_data->current();
-				$response = $response . strtotime($row[0]) . "," . $row[1] . "\r\n";
-				$row = $cache_data->next();
+				$row = $cache_data->currentAssoc();
+				$response = $response . strtotime($row['time']) . "," . $row['n'] . "\r\n";
+				$row = $cache_data->nextAssoc();
 			}
 			echo($response);
 		break;
@@ -41,12 +41,12 @@ try
 					break;
 			}*/			
 			$response = "Date/Time, Missing points\r\n";
-			while($cache_data->valid())
+			while($cache_data->validAssoc())
 			{
-				$row = $cache_data->current();
-				$response = $response . strtotime($row[0]) . "," . $row[2] . "\r\n";
-				$row = $cache_data->next();
-			}
+				$row = $cache_data->currentAssoc();
+				$response = $response . strtotime($row['time']) . "," . $row['missing'] . "\r\n";
+				$row = $cache_data->nextAssoc();
+			}			
 			echo($response);
 		break;
 		default:
